@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>JAKWO Admin — Voucher Control</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="admin-page">
+    <aside class="admin-side"><a class="brand" href="index.html"><span>JAKWO</span><b>ADMIN</b></a><a class="admin-link active">Vouchers</a><a class="admin-link" href="index.html">Back to site</a></aside>
+    <section class="admin-main">
+      <h1>VOUCHER CONTROL</h1>
+      <div id="adminLogin" class="admin-card"><h2>Admin Password</h2><input id="adminPassword" type="password" placeholder="Enter admin password" /><button id="adminEnter" class="btn purple">ENTER</button><p class="tiny-note">Static admin is for launch testing. Keep the password private.</p></div>
+      <div id="adminPanel" class="admin-hidden">
+        <div class="voucher-tiers" id="voucherTiers"></div>
+        <div class="admin-card"><h2>Recently Generated Codes</h2><div class="code-table" id="codeTable">Loading...</div></div>
+      </div>
+    </section>
+    <div class="toast"></div>
+    <script src="config.js"></script><script src="script.js"></script>
+  </main>
+</body>
+</html>

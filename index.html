@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>JAKWO War Ads Arena</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="site home-page">
+    <header class="site-header protected-ui">
+      <a class="brand" href="index.html"><span>JAKWO</span><b>ARENA ADS ★</b></a>
+      <nav class="top-actions">
+        <button class="btn purple connect-btn" type="button">CONNECT</button>
+        <a class="btn icon" id="xLink" href="#" target="_blank" rel="noreferrer">X</a>
+        <a class="btn tg" id="tgLink" href="#" target="_blank" rel="noreferrer">TG</a>
+      </nav>
+    </header>
+
+    <section class="live-row protected-ui">
+      <div class="live-badge">⌁ LIVE</div>
+      <div class="ticker-window"><div class="ticker-track">
+        <span>No fake numbers. Real arena stats only.</span>
+        <span>Buy. Place. Block. Repeat.</span>
+        <span>Ads are permanent forever — only buried by newer wars.</span>
+        <span>Latest war: <b class="latest-war">NONE</b></span>
+        <span>Total war spending: <b class="usdc-arena">0.00</b> USDC</span>
+        <span>No fake numbers. Real arena stats only.</span>
+        <span>Buy. Place. Block. Repeat.</span>
+      </div></div>
+      <div class="live-now">● LIVE NOW</div>
+    </section>
+
+    <section class="stats-grid protected-ui">
+      <div class="stat-card"><i>⚔</i><div><strong class="total-ads">0</strong><span>TOTAL ADS</span></div></div>
+      <div class="stat-card"><i>💵</i><div><strong class="usdc-arena">0.00</strong><span>USDC IN ARENA</span></div></div>
+      <div class="stat-card"><i>⚡</i><div><strong class="latest-war">NONE</strong><span>LATEST WAR</span></div></div>
+      <div class="stat-card"><i>👑</i><div><strong class="top-lord">NONE YET</strong><span>TOP WARLORD</span></div></div>
+      <div class="stat-card desktop-only"><i>🏷</i><div><strong><span class="usdc-arena">0.00</span> USDC</strong><span>TOTAL WAR SPENDING</span></div></div>
+    </section>
+
+    <section class="battle-wall" id="battleWall">
+      <div class="grunge-lines" aria-hidden="true"></div>
+      <div class="poster-card protected-ui">
+        <div class="poster-pin pin-a"></div><div class="poster-pin pin-b"></div>
+        <div class="poster-sub">PERMANENT INTERNET BATTLEFIELD</div>
+        <h1>BUY.<br>PLACE.<br><em>BLOCK.</em><br>REPEAT.</h1>
+        <p>Every image becomes part of the wall forever. Visible or buried, it stays in arena history.</p>
+        <a class="btn red poster-cta" href="upload.html">⚔ ENTER THE ARENA<br><small>Buy. Place. Fight.</small></a>
+      </div>
+
+      <div class="meme-playground" id="memeLayer" aria-label="Playable meme wall"></div>
+
+      <aside class="warlords-card protected-ui" id="warlordsCard">
+        <h3>⌖ TOP WARLORDS</h3>
+        <div class="warlord-list" id="warlordList">
+          <p><b>#1</b><span>OPEN</span><em>0 USDC</em></p>
+          <p><b>#2</b><span>OPEN</span><em>0 USDC</em></p>
+          <p><b>#3</b><span>OPEN</span><em>0 USDC</em></p>
+        </div>
+      </aside>
+
+      <div class="home-actions protected-ui">
+        <a class="big-action" href="story.html"><i>▣</i><b>READ STORY</b><span>Learn the origin.</span></a>
+        <button class="big-action panel-open" data-panel="rulesPanel"><i>🛡</i><b>RULES</b><span>Know the rules.</span></button>
+        <a class="big-action red" href="upload.html"><i>⚔</i><b>ENTER WAR</b><span>Buy. Place. Fight.</span></a>
+        <button class="big-action panel-open" data-panel="chatPanel"><i>💬</i><b>WAR CHAT</b><span>Join the arena.</span></button>
+      </div>
+    </section>
+
+    <section id="rulesPanel" class="floating-panel rules-panel protected-ui">
+      <div class="panel-head">RULES OF THE ARENA <button class="close panel-close" data-panel="rulesPanel">×</button></div>
+      <div class="panel-body">
+        <ol>
+          <li>Upload one image ad and one external link.</li>
+          <li>Choose size and position before publishing.</li>
+          <li>Pay USDC on Solana or use a valid voucher.</li>
+          <li>After publish: no edit, no move, no delete, no refund.</li>
+          <li>Ads live forever but can be covered by newer ads.</li>
+          <li>No phishing, malware, hate, explicit, impersonation, scams, or illegal content.</li>
+        </ol>
+        <p><b>This is not a billboard. It is a battlefield.</b></p>
+      </div>
+    </section>
+
+    <section id="chatPanel" class="floating-panel chat-panel protected-ui">
+      <div class="panel-head">WAR CHAT <button class="close panel-close" data-panel="chatPanel">×</button></div>
+      <div class="panel-body">
+        <p>Read free. Connect Phantom to troll. No links allowed in chat.</p>
+        <div class="chat-messages" id="chatMessages">
+          <p><b>System:</b> Arena opened. Connect wallet to chat.</p>
+          <p><b>Admin:</b> No links in chat. Ads can have links.</p>
+          <p><b>Jakwo:</b> Buy. Place. Block. Repeat.</p>
+        </div>
+        <div class="chat-input"><input id="chatText" class="need-wallet" placeholder="Connect wallet to chat" /><button id="chatSend">➤</button></div>
+      </div>
+    </section>
+
+    <div class="war-impact" id="warImpact"><div class="impact-text">WAR DECLARED</div></div>
+    <div class="toast"></div>
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+  </main>
+</body>
+</html>
