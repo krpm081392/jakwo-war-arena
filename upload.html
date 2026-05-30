@@ -28,7 +28,11 @@
         <label>1 Upload Image</label>
         <input id="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden />
         <div class="drop" id="dropZone">Click or drag image here<br><small>PNG, JPG, GIF, WEBP</small></div>
-        <div class="image-tools"><button id="changeImage" class="btn small" type="button">CHANGE IMAGE</button><button id="removeImage" class="btn small danger" type="button">REMOVE</button></div>
+        <div class="image-tools" id="imageTools">
+          <button class="btn small" id="changeImage" type="button">CHANGE IMAGE</button>
+          <button class="btn small danger" id="removeImage" type="button">REMOVE</button>
+        </div>
+        <p class="tiny-note">Tip: drag the image to place it. Hold the bottom-right corner to resize.</p>
 
         <label>2 Paste External Link</label>
         <input id="adLink" placeholder="https://yourlink.com" />
