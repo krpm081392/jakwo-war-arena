@@ -297,7 +297,7 @@
 /* PATCH: draggable/playable decorative stickers in sidebar/topbar only */
 (function(){
   function initDecorStickers(){
-    document.querySelectorAll('.decor-sticker').forEach(function(el){
+    document.querySelectorAll('.wojak-card').forEach(function(el){
       if(el.dataset.ready==='1') return;
       el.dataset.ready='1';
       let dragging=false, sx=0, sy=0, ox=0, oy=0, moved=false;
