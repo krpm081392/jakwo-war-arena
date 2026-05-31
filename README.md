@@ -1,11 +1,7 @@
-# JAKWO War Ads Arena - Static Build
+# JAKWO / Meme War Ads Arena
 
-Deploy as static site. No npm, no package.json, no Next.js.
+Static no-npm deployment. Upload all files to GitHub root and deploy on Vercel as Framework: Other.
 
-Upload all files to GitHub root:
-index.html, story.html, admin.html, style.css, script.js, admin.js, config.js, vercel.json, supabase-schema.sql
+Core rules: upload image, add one link, move/resize freely before deployment, price by coverage from 0.50 to 1,000,000 USDC, then lock forever after confirmed payment or valid voucher.
 
-Admin URL: /admin.html
-Default password: JAKWOADMIN2026
-
-Important: This static build is UI + local demo locking. Production must wire verified Phantom/Solana USDC payment before public money launch.
+Admin: /admin.html
