@@ -34,3 +34,9 @@ html,body{background:#d7b783;color:var(--ink)}
 @media(max-width:760px){
   .top-row{height:34px}.brand{font-size:17px}.btn{font-size:10px;padding:6px 7px}.ticker-row{height:22px}.live-label{width:46px}.stats-row{height:34px}.app-shell{padding-top:90px}.arena-viewport{height:calc(100vh - 90px - 54px)}.bottom-nav{height:54px}.bottom-nav button{font-size:16px}.bottom-nav span{font-size:8px}.live-cost{bottom:62px}.empty-callout{top:42%;padding:14px}.empty-callout h1{font-size:22px}.empty-callout p{font-size:11px}
 }
+
+/* HOTFIX: keep UI buttons clickable above the arena layers */
+.top-shell,.top-actions,.top-actions a,.top-actions button,.side-nav,.side-btn,.bottom-nav,.bottom-nav button,.place-ad,.panel,.bottom-sheet{pointer-events:auto!important}
+.top-shell{z-index:500!important}.side-nav{z-index:450!important}.bottom-nav{z-index:520!important}.place-ad{z-index:530!important}.panel{z-index:900!important}.bottom-sheet{z-index:850!important}.live-cost{z-index:440!important}
+.ad-layer{z-index:5}.draft-layer{z-index:15}.empty-callout{z-index:1}
+@media(max-width:760px){.top-actions{gap:4px}.top-actions .btn.mini{min-width:34px;text-align:center}.bottom-nav button:nth-child(3)::before{content:'+';display:block;font-size:20px;line-height:16px}.bottom-nav button:nth-child(3){font-size:0}.bottom-nav button:nth-child(3) span{font-size:8px}}

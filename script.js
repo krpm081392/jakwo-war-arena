@@ -103,3 +103,40 @@ function updateStats(){ const ads=getAds(); $('totalAds').textContent=ads.length
 function warImpact(price){ document.body.classList.add('impact'); if(navigator.vibrate) navigator.vibrate(price>100000?[250,80,250,80,250]:[80]); setTimeout(()=>document.body.classList.remove('impact'),900); if(price>=1000000) alert('🚨 TSUNAMI ALERT: ARENA DOMINATOR DETECTED. Lockdown mode should trigger in production.'); }
 function escapeHTML(s){return s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 init();
+
+// === HOTFIX: reliable buttons/links and mobile controls ===
+(function(){
+  function byId(id){ return document.getElementById(id); }
+  function openAnyPanel(type){
+    if (typeof openPanel === 'function') openPanel(type);
+  }
+  window.addEventListener('DOMContentLoaded', function(){
+    const tw = byId('twitterLink');
+    const tg = byId('telegramLink');
+    if (tw) { tw.href = (window.JAKWO_CONFIG && window.JAKWO_CONFIG.TWITTER) || 'https://x.com/jakw0o'; tw.textContent = 'X'; tw.target='_blank'; }
+    if (tg) { tg.href = (window.JAKWO_CONFIG && window.JAKWO_CONFIG.TELEGRAM) || 'https://t.me/+hJ-0IQGfYTRmYjM0'; tg.textContent = 'TG'; tg.target='_blank'; }
+
+    // Direct click binding for all panel buttons, including mobile bottom nav.
+    document.querySelectorAll('[data-panel]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        openAnyPanel(btn.getAttribute('data-panel'));
+      };
+    });
+
+    const placeDesktop = byId('placeAdBtn');
+    const placeMobile = byId('mobilePlaceAd');
+    if (placeDesktop) placeDesktop.onclick = function(e){ e.preventDefault(); e.stopPropagation(); if (typeof openSheet === 'function') openSheet(); };
+    if (placeMobile) placeMobile.onclick = function(e){ e.preventDefault(); e.stopPropagation(); if (typeof openSheet === 'function') openSheet(); };
+
+    // Admin shortcut: click JAKWO logo 5 times.
+    const brand = document.querySelector('.brand');
+    let taps = 0;
+    if (brand) brand.addEventListener('click', function(e){
+      taps++;
+      if (taps >= 5) { e.preventDefault(); location.href = 'admin.html'; }
+      setTimeout(function(){ taps = 0; }, 1500);
+    });
+  });
+})();
