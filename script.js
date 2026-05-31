@@ -131,6 +131,59 @@
     document.body.classList.add('shake'); $('#impactFlash').classList.add('flash');
     setTimeout(()=>{document.body.classList.remove('shake'); $('#impactFlash').classList.remove('flash')}, 600);
   }
+
+
+  // PATCH: persist deployed ads so refresh does not erase the arena.
+  function readSavedAds(){
+    try { return JSON.parse(localStorage.getItem('jakwo_deployed_ads') || '[]'); }
+    catch(_e){ return []; }
+  }
+  function writeSavedAds(rows){
+    localStorage.setItem('jakwo_deployed_ads', JSON.stringify(rows.slice(-500)));
+  }
+  function saveDeployedAd(el, data){
+    const rows = readSavedAds();
+    rows.push({
+      id: data.id || ('ad_' + Date.now() + '_' + Math.random().toString(36).slice(2,8)),
+      src: data.src,
+      name: data.name || 'Unnamed War Ad',
+      link: data.link || '',
+      price: Number(data.price || 0),
+      left: el.style.left,
+      top: el.style.top,
+      width: el.style.width,
+      height: el.style.height,
+      at: Date.now()
+    });
+    writeSavedAds(rows);
+  }
+  function bindLockedLink(el, link){
+    if(!link) return;
+    el.classList.add('clickable-ad');
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(link, '_blank', 'noopener,noreferrer');
+    });
+  }
+  function restoreDeployedAds(){
+    const rows = readSavedAds();
+    rows.forEach(row => {
+      if(!row.src) return;
+      const ad = document.createElement('div');
+      ad.className = 'ad locked';
+      ad.style.left = row.left || '14%';
+      ad.style.top = row.top || '18%';
+      ad.style.width = row.width || '120px';
+      ad.style.height = row.height || '90px';
+      ad.dataset.name = row.name || 'Unnamed War Ad';
+      ad.dataset.link = row.link || '';
+      ad.title = row.link ? `Open ${row.name || 'War Ad'}` : (row.name || 'War Ad');
+      ad.innerHTML = `<img src="${row.src}" alt="war ad">`;
+      arena.appendChild(ad);
+      bindLockedLink(ad, row.link || '');
+    });
+  }
   function announce(name, price){
     $('#tickerText').textContent = `🚨 ${name} launched a new war ad for ${price.toFixed(2)} USDC • Buy. Place. Block. Repeat. • New ads can cover old ads •`;
   }
@@ -266,14 +319,15 @@
     deployedAd.dataset.link = adLink;
     deployedAd.title = adLink ? `Open ${name}` : name;
 
-    if(adLink){
-      deployedAd.classList.add('clickable-ad');
-      deployedAd.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.open(adLink, '_blank', 'noopener,noreferrer');
-      });
-    }
+    bindLockedLink(deployedAd, adLink);
+
+    const img = deployedAd.querySelector('img');
+    saveDeployedAd(deployedAd, {
+      src: img ? img.src : '',
+      name,
+      link: adLink,
+      price: p.price
+    });
 
     markVoucherUsed(voucher);
     $('#voucherCode').value = '';
@@ -291,6 +345,7 @@
   $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
   $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));
 
+  restoreDeployedAds();
   updateWallet(); renderStats(); updatePrice();
 })();
 
