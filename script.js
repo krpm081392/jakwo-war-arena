@@ -73,9 +73,10 @@
     $('#coverageText').textContent = `${p.coverage.toFixed(2)}%`;
     $('#sheetPrice').textContent = `${p.price.toFixed(2)} USDC`;
   }
-  function openSheet(){ sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); }
+  function openSheet(){ closePanel(); sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); }
   function closeSheet(){ sheet.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); }
   function openPanel(type){
+    closeSheet();
     const map = {
       rules: rulesHTML,
       story: storyHTML,
@@ -123,7 +124,6 @@
     $('#tickerText').textContent = `🚨 ${name} launched a new war ad for ${price.toFixed(2)} USDC • Buy. Place. Block. Repeat. • New ads can cover old ads •`;
   }
   function addAd(src){
-    $('#emptyCard')?.remove();
     const ad = document.createElement('div');
     ad.className = 'ad editing';
     ad.style.left = '14%'; ad.style.top = '18%'; ad.style.width = '120px'; ad.style.height = '90px';
@@ -178,6 +178,29 @@
       alert('Wallet connect cancelled or failed. Try opening in Phantom browser.');
     }
   }
+
+  function voucherValue(code){
+    const c = (code || '').toUpperCase().replace(/,/g,'');
+    if(!c) return 0;
+    if(c === 'TEST') return 0.5;
+    const m = c.match(/(1000000|1000|500|100|0\.5|050|50|5)/);
+    if(!m) return 0;
+    if(m[1] === '050') return 0.5;
+    return Number(m[1]);
+  }
+  function resizeAdToPrice(target){
+    if(!currentAd || !target) return;
+    const arenaArea = arena.clientWidth * arena.scrollHeight;
+    const clamped = Math.max(0.5, Math.min(1000000, target));
+    let coverage = Math.pow((clamped - 0.5) / 999999.5, 1 / 2.4) * 100;
+    if(clamped <= 0.5) coverage = 0.1;
+    const area = Math.max(1600, arenaArea * coverage / 100);
+    const side = Math.max(40, Math.sqrt(area));
+    currentAd.style.width = Math.round(side) + 'px';
+    currentAd.style.height = Math.round(side * 0.75) + 'px';
+    updatePrice();
+  }
+
   function deploy(){
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
     if(!wallet){ alert('Connect wallet first.'); return; }
@@ -189,12 +212,30 @@
       alert('Payment required. This static test will NOT publish free. Use voucher TEST to demo lock, or wire Phantom USDC payment before public launch.');
       return;
     }
-    if(!['TEST','PROMO','FIRST100'].includes(voucher) && !voucher.startsWith('JAKWO-')){
+    if(!['TEST','PROMO','FIRST100'].includes(voucher) && !voucher.startsWith('JAKWO-') && !voucherValue(voucher)){
       alert('Invalid voucher code.'); return;
     }
-    currentAd.classList.remove('editing'); currentAd.classList.add('locked');
-    currentAd.dataset.name = name; currentAd.dataset.link = $('#adLink').value.trim();
-    currentAd.addEventListener('click',()=>{ if(currentAd.dataset.link) window.open(currentAd.dataset.link,'_blank'); });
+    const vv = voucherValue(voucher);
+    if(vv) resizeAdToPrice(vv);
+    const deployedAd = currentAd;
+    let adLink = ($('#adLink').value || '').trim();
+    if(adLink && !/^https?:\/\//i.test(adLink)) adLink = 'https://' + adLink;
+
+    deployedAd.classList.remove('editing');
+    deployedAd.classList.add('locked');
+    deployedAd.dataset.name = name;
+    deployedAd.dataset.link = adLink;
+    deployedAd.title = adLink ? `Open ${name}` : name;
+
+    if(adLink){
+      deployedAd.classList.add('clickable-ad');
+      deployedAd.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(adLink, '_blank', 'noopener,noreferrer');
+      });
+    }
+
     stats.total += 1; stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name,p.price); impact(); closeSheet(); currentAd=null; updatePrice();
     alert('Ad deployed and locked for test. Real paid launch must replace voucher demo with verified USDC payment.');
   }
@@ -203,6 +244,8 @@
   $('#addBtn').onclick = openSheet; $('#mobileAddBtn').onclick = openSheet; $('#closeSheet').onclick = closeSheet;
   $('#closePanel').onclick = closePanel;
   $('#deployBtn').onclick = deploy;
+  $('#voucherCode').addEventListener('change', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
+  $('#voucherCode').addEventListener('input', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };
   $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
   $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));

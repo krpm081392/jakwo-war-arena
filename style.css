@@ -54,3 +54,39 @@
   .panel[data-type="chat"].keyboard-mode{bottom:10px!important;max-height:42vh!important;}
   .chat-messages{max-height:110px}.chat-row input{height:40px}.chat-send{height:40px}
 }
+
+.ad.locked.clickable-ad{cursor:pointer;}
+.ad.locked.clickable-ad:hover{filter:brightness(1.08);}
+
+
+/* PATCH blank arena + one-window mobile cleanup */
+.empty-card{display:none!important;}
+.sheet,.panel{overscroll-behavior:contain;}
+@media(max-width:800px){
+  /* remove ugly floating X on phone; users close by tapping another menu, double-tap panel, or bottom nav */
+  #closeSheet.close,#closePanel.close{display:none!important;}
+  .sheet{
+    width:76vw!important;
+    max-width:315px!important;
+    right:8px!important;
+    left:auto!important;
+    transform:none!important;
+    max-height:48vh!important;
+    padding:9px 11px!important;
+    border-radius:12px 12px 0 0!important;
+    font-size:12px!important;
+  }
+  .sheet.open{bottom:60px!important;}
+  .sheet h2{font-size:16px!important;margin:2px 0 6px!important;}
+  .grab{height:4px!important;width:44px!important;margin-bottom:5px!important;}
+  .upload-box{height:40px!important;margin:5px 0!important;font-size:12px!important;}
+  .sheet input{height:30px!important;margin:4px 0!important;font-size:12px!important;padding:0 8px!important;}
+  .price-line{margin:3px 0!important;font-size:13px!important;}
+  .hint{font-size:9px!important;line-height:1.15!important;margin:4px 0!important;}
+  .deploy{height:36px!important;font-size:13px!important;}
+  .panel{font-size:13px!important;}
+}
+@media(min-width:801px){
+  .sheet{right:18px!important;bottom:-110%!important;width:335px!important;max-height:68vh!important;}
+  .sheet.open{bottom:84px!important;}
+}
