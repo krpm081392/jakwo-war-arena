@@ -190,8 +190,28 @@
     }
   }
 
+  function cleanVoucher(code){
+    return (code || '').trim().toUpperCase().replace(/,/g,'');
+  }
+  function usedVouchers(){
+    try { return JSON.parse(localStorage.getItem('jakwo_used_vouchers') || '[]'); }
+    catch(_e){ return []; }
+  }
+  function isVoucherUsed(code){
+    const c = cleanVoucher(code);
+    return !!c && usedVouchers().includes(c);
+  }
+  function markVoucherUsed(code){
+    const c = cleanVoucher(code);
+    if(!c) return;
+    const used = usedVouchers();
+    if(!used.includes(c)){
+      used.push(c);
+      localStorage.setItem('jakwo_used_vouchers', JSON.stringify(used));
+    }
+  }
   function voucherValue(code){
-    const c = (code || '').toUpperCase().replace(/,/g,'');
+    const c = cleanVoucher(code);
     if(!c) return 0;
     if(c === 'TEST') return 0.5;
     const m = c.match(/(?:^|[-_\s])(1000000|1000|500|100|0\.5|050|50|5)(?:$|[-_\s])/);
@@ -216,7 +236,7 @@
   function deploy(){
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
     if(!wallet){ alert('Connect wallet first.'); return; }
-    const voucher = $('#voucherCode').value.trim().toUpperCase();
+    const voucher = cleanVoucher($('#voucherCode').value);
     const name = ($('#adName').value || 'Unnamed War Ad').trim().slice(0,40);
     let p = priceFor(currentAd);
 
@@ -226,6 +246,9 @@
     }
     if(!['TEST','PROMO','FIRST100'].includes(voucher) && !voucher.startsWith('JAKWO-') && !voucherValue(voucher)){
       alert('Invalid voucher code.'); return;
+    }
+    if(isVoucherUsed(voucher)){
+      alert('This voucher was already used. One voucher = one ad only.'); return;
     }
     const vv = voucherValue(voucher);
     if(vv){
@@ -252,8 +275,10 @@
       });
     }
 
+    markVoucherUsed(voucher);
+    $('#voucherCode').value = '';
     stats.total += 1; stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name,p.price); impact(); closeSheet(); currentAd=null; updatePrice();
-    alert('Ad deployed and locked for test. Real paid launch must replace voucher demo with verified USDC payment.');
+    alert('Ad deployed and locked for test. Voucher burned. Real paid launch must replace voucher demo with verified USDC payment.');
   }
 
   $('#connectBtn').onclick = connect;
