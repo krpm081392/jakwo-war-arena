@@ -332,6 +332,89 @@
     updatePrice();
   }
 
+  async function payUsdc(amount){
+    const provider = window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null);
+    if(!provider || !provider.publicKey){
+      alert('Wallet connected but Phantom provider is not ready. Open in Phantom browser and reconnect.');
+      throw new Error('No Phantom provider');
+    }
+    if(!window.solanaWeb3){
+      alert('Solana payment library failed to load. Refresh and try again.');
+      throw new Error('solanaWeb3 missing');
+    }
+    const web3 = window.solanaWeb3;
+    const rpc = config.solanaRpc || config.NEXT_PUBLIC_SOLANA_RPC || 'https://api.mainnet-beta.solana.com';
+    const receiverWallet = config.receiverWallet || config.NEXT_PUBLIC_RECEIVER_WALLET || '';
+    if(!receiverWallet){
+      alert('Receiver wallet missing in config.js');
+      throw new Error('receiver wallet missing');
+    }
+    const connection = new web3.Connection(rpc, 'confirmed');
+    const payer = provider.publicKey;
+    const receiver = new web3.PublicKey(receiverWallet);
+    const mint = new web3.PublicKey(config.usdcMint || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+    const TOKEN_PROGRAM_ID = new web3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+    const ASSOCIATED_TOKEN_PROGRAM_ID = new web3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+    const SYSVAR_RENT_PUBKEY = new web3.PublicKey('SysvarRent111111111111111111111111111111111');
+    const getAta = async (owner) => (await web3.PublicKey.findProgramAddress(
+      [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    ))[0];
+    const senderAta = await getAta(payer);
+    const receiverAta = await getAta(receiver);
+    const senderInfo = await connection.getAccountInfo(senderAta);
+    if(!senderInfo){
+      alert('No USDC token account found in this wallet. Add mainnet USDC first.');
+      throw new Error('sender USDC ATA missing');
+    }
+    const instructions = [];
+    const receiverInfo = await connection.getAccountInfo(receiverAta);
+    if(!receiverInfo){
+      instructions.push(new web3.TransactionInstruction({
+        programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+        keys: [
+          { pubkey: payer, isSigner: true, isWritable: true },
+          { pubkey: receiverAta, isSigner: false, isWritable: true },
+          { pubkey: receiver, isSigner: false, isWritable: false },
+          { pubkey: mint, isSigner: false, isWritable: false },
+          { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
+        ],
+        data: new Uint8Array([])
+      }));
+    }
+    const amountUnits = BigInt(Math.round(Number(amount) * 1_000_000));
+    const data = new Uint8Array(10);
+    data[0] = 12; // TransferChecked
+    let n = amountUnits;
+    for(let i=0;i<8;i++){ data[1+i] = Number(n & 255n); n >>= 8n; }
+    data[9] = 6; // USDC decimals
+    instructions.push(new web3.TransactionInstruction({
+      programId: TOKEN_PROGRAM_ID,
+      keys: [
+        { pubkey: senderAta, isSigner: false, isWritable: true },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: receiverAta, isSigner: false, isWritable: true },
+        { pubkey: payer, isSigner: true, isWritable: false }
+      ],
+      data
+    }));
+    const tx = new web3.Transaction().add(...instructions);
+    tx.feePayer = payer;
+    tx.recentBlockhash = (await connection.getLatestBlockhash('finalized')).blockhash;
+    let sig;
+    if(provider.signAndSendTransaction){
+      const res = await provider.signAndSendTransaction(tx);
+      sig = res.signature;
+    } else {
+      const signed = await provider.signTransaction(tx);
+      sig = await connection.sendRawTransaction(signed.serialize());
+    }
+    await connection.confirmTransaction(sig, 'confirmed');
+    return sig;
+  }
+
   async function deploy(){
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
     if(!wallet){ alert('Connect wallet first.'); return; }
@@ -342,21 +425,31 @@
     if(budgetVal >= 0.5) resizeAdToPrice(budgetVal);
     let p = priceFor(currentAd);
 
-    if(!voucher){
-      alert('Payment required. This static test will NOT publish free. Use voucher TEST to demo lock, or wire Phantom USDC payment before public launch.');
-      return;
-    }
-    if(!['TEST','PROMO','FIRST100'].includes(voucher) && !voucher.startsWith('JAKWO-') && !voucherValue(voucher)){
-      alert('Invalid voucher code.'); return;
-    }
-    if(isVoucherUsed(voucher)){
-      alert('This voucher was already used. One voucher = one ad only.'); return;
-    }
-    const vv = voucherValue(voucher);
-    if(vv){
-      resizeAdToPrice(vv);
-      p = priceFor(currentAd);
-      p.price = vv;
+    let paymentSignature = '';
+    if(voucher){
+      if(!['TEST','PROMO','FIRST100'].includes(voucher) && !voucher.startsWith('JAKWO-') && !voucherValue(voucher)){
+        alert('Invalid voucher code.'); return;
+      }
+      if(isVoucherUsed(voucher)){
+        alert('This voucher was already used. One voucher = one ad only.'); return;
+      }
+      const vv = voucherValue(voucher);
+      if(vv){
+        resizeAdToPrice(vv);
+        p = priceFor(currentAd);
+        p.price = vv;
+      }
+    } else {
+      try{
+        $('#deployBtn').disabled = true;
+        $('#deployBtn').textContent = 'OPENING PHANTOM...';
+        paymentSignature = await payUsdc(p.price);
+      }catch(e){
+        console.warn('Payment failed:', e);
+        $('#deployBtn').disabled = false;
+        $('#deployBtn').textContent = 'DEPLOY TO WAR';
+        return;
+      }
     }
     const deployedAd = currentAd;
     let adLink = ($('#adLink').value || '').trim();
@@ -377,11 +470,14 @@
       });
     }
 
-    markVoucherUsed(voucher);
+    if(voucher) markVoucherUsed(voucher);
+    if(paymentSignature) deployedAd.dataset.tx = paymentSignature;
     await saveDeployedAd(deployedAd, p.price);
     $('#voucherCode').value = '';
     stats.total += 1; stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name,p.price); impact(); closeSheet(); currentAd=null; updatePrice();
-    alert('Ad deployed and locked for test. Voucher burned. Real paid launch must replace voucher demo with verified USDC payment.');
+    $('#deployBtn').disabled = false;
+    $('#deployBtn').textContent = 'DEPLOY TO WAR';
+    alert(paymentSignature ? 'Payment confirmed. Ad deployed and locked forever.' : 'Voucher accepted. Ad deployed and locked forever.');
   }
 
   $('#connectBtn').onclick = connect;
