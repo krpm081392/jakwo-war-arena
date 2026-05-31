@@ -43,7 +43,15 @@
     <h3>10. Final Rule</h3><p><b>Buy. Place. Block. Repeat.</b> Once your ad enters the arena, it lives there forever — visible or buried, but never removed.</p>`;
 
   function shortWallet(w){ return w ? w.slice(0,4) + '...' + w.slice(-4) : 'CONNECT'; }
-  function updateWallet(){ $('#connectBtn').textContent = shortWallet(wallet); }
+  function updateWallet(){
+    const btn = $('#connectBtn');
+    btn.textContent = shortWallet(wallet);
+    btn.title = wallet ? 'Click to disconnect wallet' : 'Connect Phantom wallet';
+    $$('.wallet-required').forEach(el=>{
+      el.disabled = !wallet;
+      el.placeholder = wallet ? 'Type message...' : 'Connect wallet to chat';
+    });
+  }
   function saveStats(){ localStorage.setItem('jakwo_stats', JSON.stringify(stats)); }
   function renderStats(){
     $('#totalAds').textContent = stats.total;
@@ -72,10 +80,17 @@
       rules: rulesHTML,
       story: storyHTML,
       leaderboard: `<h2>🏆 TOP WARLORDS</h2><p>No confirmed paid warlords yet.</p><p>Leaderboard will rank advertisers by real paid volume.</p>`,
-      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><input placeholder="Connect wallet to chat" style="width:100%;height:44px;padding:10px">`
+      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><input class="wallet-required" placeholder="Connect wallet to chat" style="width:100%;height:44px;padding:10px">`
     };
+    panel.dataset.type = type;
     panelContent.innerHTML = map[type] || '';
     panel.classList.remove('hidden');
+    updateWallet();
+    if(type === 'chat'){
+      const input = panel.querySelector('input');
+      input?.addEventListener('focus', () => panel.classList.add('keyboard-mode'));
+      input?.addEventListener('blur', () => panel.classList.remove('keyboard-mode'));
+    }
   }
   function closePanel(){ panel.classList.add('hidden'); }
   function impact(){
@@ -117,10 +132,29 @@
   }
   async function connect(){
     try{
-      if(window.solana?.isPhantom){ const r = await window.solana.connect(); wallet = r.publicKey.toString(); }
-      else { wallet = 'DEMO' + Math.random().toString(36).slice(2,8).toUpperCase(); alert('Phantom not found. Demo wallet connected for testing.'); }
-      localStorage.setItem('jakwo_wallet', wallet); updateWallet();
-    }catch(e){ alert('Wallet connect cancelled.'); }
+      if(wallet){
+        if(confirm('Disconnect wallet?')){
+          try{ await (window.solana || window.phantom?.solana)?.disconnect?.(); }catch(_e){}
+          wallet = '';
+          localStorage.removeItem('jakwo_wallet');
+          updateWallet();
+        }
+        return;
+      }
+      const provider = window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null);
+      if(provider){
+        const r = await provider.connect({ onlyIfTrusted:false });
+        wallet = r.publicKey.toString();
+      } else {
+        alert('Phantom wallet not found. Install Phantom or open this site in Phantom browser.');
+        return;
+      }
+      localStorage.setItem('jakwo_wallet', wallet);
+      updateWallet();
+    }catch(e){
+      console.warn('Wallet connect failed:', e);
+      alert('Wallet connect cancelled or failed. Try opening in Phantom browser.');
+    }
   }
   function deploy(){
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
