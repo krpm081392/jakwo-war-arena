@@ -293,3 +293,31 @@
 
   updateWallet(); renderStats(); updatePrice();
 })();
+
+/* PATCH: draggable/playable decorative stickers in sidebar/topbar only */
+(function(){
+  function initDecorStickers(){
+    document.querySelectorAll('.decor-sticker').forEach(function(el){
+      if(el.dataset.ready==='1') return;
+      el.dataset.ready='1';
+      let dragging=false, sx=0, sy=0, ox=0, oy=0, moved=false;
+      const getXY=()=>({x:parseFloat(el.dataset.x||0),y:parseFloat(el.dataset.y||0)});
+      const setXY=(x,y)=>{el.dataset.x=x; el.dataset.y=y; el.style.translate=x+'px '+y+'px';};
+      el.addEventListener('pointerdown',function(e){
+        dragging=true; moved=false; sx=e.clientX; sy=e.clientY; const p=getXY(); ox=p.x; oy=p.y; el.setPointerCapture(e.pointerId);
+      });
+      el.addEventListener('pointermove',function(e){
+        if(!dragging) return;
+        const dx=e.clientX-sx, dy=e.clientY-sy;
+        if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
+        setXY(ox+dx, oy+dy);
+      });
+      el.addEventListener('pointerup',function(e){
+        dragging=false;
+        try{el.releasePointerCapture(e.pointerId)}catch(_){}
+        if(!moved){ el.classList.remove('spin'); void el.offsetWidth; el.classList.add('spin'); }
+      });
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initDecorStickers); else initDecorStickers();
+})();

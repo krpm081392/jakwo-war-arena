@@ -163,3 +163,6 @@
   .sheet .deploy{height:34px!important;}
   .sheet .price-line{font-size:12px!important;}
 }
+
+/* PATCH: playful decorative JAKWO/Wojak stickers only on empty top + side areas */
+.topbar,.sidebar{position:relative;overflow:hidden}.brand,.top-actions,.sidebar>button{position:relative;z-index:3}.top-deco-layer,.side-deco-layer{position:absolute;inset:0;z-index:1;pointer-events:none}.decor-sticker{position:absolute;z-index:2;pointer-events:auto;cursor:grab;user-select:none;touch-action:none;font-weight:1000;border:2px solid rgba(61,28,10,.75);border-radius:8px;background:rgba(246,222,167,.76);color:#3b1a0a;padding:5px 8px;box-shadow:3px 4px 0 rgba(40,16,4,.35);font-size:12px;transform:rotate(-8deg);white-space:nowrap}.decor-sticker:active{cursor:grabbing}.decor-sticker.spin{animation:decoSpin .45s ease}@keyframes decoSpin{to{transform:rotate(360deg) scale(1.06)}}.top-s1{left:170px;top:8px;transform:rotate(7deg)}.top-s2{left:43%;top:6px;transform:rotate(-6deg)}.top-s3{right:235px;top:10px;transform:rotate(5deg)}.side-s1{left:18px;top:245px;transform:rotate(-12deg)}.side-s2{left:48px;top:360px;transform:rotate(9deg)}.side-s3{left:11px;top:520px;transform:rotate(7deg)}.side-s4{left:52px;top:690px;transform:rotate(-10deg)}@media(max-width:800px){.top-deco-layer,.side-deco-layer{display:none}}
