@@ -9,6 +9,16 @@
   let wallet = localStorage.getItem('jakwo_wallet') || '';
   let currentAd = null;
   let stats = JSON.parse(localStorage.getItem('jakwo_stats') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
+  const ADS_KEY = 'jakwo_deployed_ads_v1';
+  const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const supa = (() => {
+    try {
+      const url = config.supabaseUrl || config.NEXT_PUBLIC_SUPABASE_URL || '';
+      const key = config.supabaseAnonKey || config.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      if (window.supabase && url && key) return window.supabase.createClient(url, key);
+    } catch(_e) {}
+    return null;
+  })();
 
   const storyHTML = `
     <h2>THE STORY OF JAKWO</h2>
@@ -102,27 +112,40 @@
       const input = panel.querySelector('#chatInput');
       const send = panel.querySelector('#chatSend');
       const messages = panel.querySelector('#chatMessages');
-      const renderChat = () => {
-        const rows = JSON.parse(localStorage.getItem('jakwo_chat') || '[]');
+      const localChatRows = () => { try { return JSON.parse(localStorage.getItem('jakwo_chat') || '[]'); } catch(_e){ return []; } };
+      const renderChat = async () => {
+        let rows = [];
+        if(supa){
+          try{
+            const { data, error } = await supa.from('chat_messages').select('*').order('created_at', { ascending:true }).limit(80);
+            if(!error && Array.isArray(data)) rows = data.map(r => ({ wallet: r.wallet, text: r.message }));
+          }catch(e){ console.warn('Supabase chat load failed:', e); }
+        }
+        if(!rows.length) rows = localChatRows();
         messages.innerHTML = rows.length ? rows.map(r => `<p><b>${r.wallet}</b>: ${r.text}</p>`).join('') : '<p><b>System:</b> Connect wallet to join the war chat.</p>';
         messages.scrollTop = messages.scrollHeight;
       };
-      const sendChat = () => {
+      const sendChat = async () => {
         if(!wallet){ alert('Connect wallet first to chat.'); return; }
         const text = (input.value || '').trim();
         if(!text) return;
         if(/https?:\/\/|www\.|t\.me|discord\.gg/i.test(text)){ alert('No links allowed in war chat.'); return; }
-        const rows = JSON.parse(localStorage.getItem('jakwo_chat') || '[]');
-        rows.push({ wallet: shortWallet(wallet), text: text.slice(0,160), at: Date.now() });
-        localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-50)));
+        const row = { wallet: shortWallet(wallet), text: text.slice(0,160), at: Date.now() };
+        const rows = localChatRows();
+        rows.push(row);
+        localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-80)));
+        if(supa){
+          try{ await supa.from('chat_messages').insert({ wallet: row.wallet, message: row.text }); }catch(e){ console.warn('Supabase chat send failed:', e); }
+        }
         input.value = '';
-        renderChat();
+        await renderChat();
       };
       input?.addEventListener('focus', () => panel.classList.add('keyboard-mode'));
       input?.addEventListener('blur', () => panel.classList.remove('keyboard-mode'));
       input?.addEventListener('keydown', e => { if(e.key === 'Enter') sendChat(); });
       send?.addEventListener('click', sendChat);
       renderChat();
+      if(supa){ setTimeout(()=>renderChat(), 1200); }
       updateWallet();
     }
   }
@@ -137,11 +160,81 @@
   function addAd(src){
     const ad = document.createElement('div');
     ad.className = 'ad editing';
-    ad.style.left = '14%'; ad.style.top = '18%'; ad.style.width = '120px'; ad.style.height = '90px';
+    ad.style.left = '14%'; ad.style.top = '18%'; ad.style.width = '40px'; ad.style.height = '40px';
     ad.innerHTML = `<button class="x" title="Remove">×</button><img src="${src}" alt="war ad"><span class="resize"></span>`;
     arena.appendChild(ad);
-    currentAd = ad; makeInteractive(ad); updatePrice();
+    currentAd = ad; const bi=$('#budgetInput'); if(bi) bi.value='0.50'; makeInteractive(ad); updatePrice();
   }
+  function getLocalAds(){
+    try { return JSON.parse(localStorage.getItem(ADS_KEY) || '[]'); } catch(_e){ return []; }
+  }
+  function setLocalAds(rows){
+    localStorage.setItem(ADS_KEY, JSON.stringify(rows || []));
+  }
+  function adRecordFromElement(el, amount){
+    const img = el.querySelector('img');
+    return {
+      id: el.dataset.id || ('ad_' + Date.now() + '_' + Math.random().toString(16).slice(2)),
+      image_url: img ? img.src : '',
+      link: el.dataset.link || '',
+      wallet: wallet || '',
+      amount: Number(amount || 0),
+      x: parseFloat(el.style.left) || 0,
+      y: parseFloat(el.style.top) || 0,
+      w: el.offsetWidth || parseFloat(el.style.width) || 40,
+      h: el.offsetHeight || parseFloat(el.style.height) || 40,
+      name: el.dataset.name || 'War Ad',
+      locked: true,
+      created_at: new Date().toISOString()
+    };
+  }
+  function renderDeployedAd(r){
+    if(!r || !r.image_url) return;
+    const ad = document.createElement('div');
+    ad.className = 'ad locked';
+    ad.dataset.id = r.id || '';
+    ad.dataset.name = r.name || 'War Ad';
+    ad.dataset.link = r.link || '';
+    ad.style.left = (Number(r.x) || 0) + 'px';
+    ad.style.top = (Number(r.y) || 0) + 'px';
+    ad.style.width = Math.max(40, Number(r.w) || 40) + 'px';
+    ad.style.height = Math.max(40, Number(r.h) || 40) + 'px';
+    ad.innerHTML = `<img src="${r.image_url}" alt="war ad">`;
+    if(r.link){
+      ad.classList.add('clickable-ad');
+      ad.title = `Open ${r.name || 'War Ad'}`;
+      ad.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); window.open(r.link, '_blank', 'noopener,noreferrer'); });
+    }
+    arena.appendChild(ad);
+  }
+  async function saveDeployedAd(el, amount){
+    const rec = adRecordFromElement(el, amount);
+    el.dataset.id = rec.id;
+    const rows = getLocalAds().filter(a => a.id !== rec.id);
+    rows.push(rec);
+    setLocalAds(rows);
+    if(supa){
+      try{
+        const dbRec = { image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, x: rec.x, y: rec.y, w: rec.w, h: rec.h, locked: true, voucher_code: cleanVoucher($('#voucherCode')?.value || '') || null };
+        const oldId = rec.id;
+        const { data, error } = await supa.from('ads').insert(dbRec).select('id').single();
+        if(!error && data?.id){ rec.id = data.id; el.dataset.id = data.id; const updated = getLocalAds().filter(a => a.id !== oldId && a.id !== data.id); updated.push({...rec, id:data.id}); setLocalAds(updated); }
+      }catch(e){ console.warn('Supabase ad save failed, local save still kept:', e); }
+    }
+  }
+  async function loadDeployedAds(){
+    let rows = [];
+    if(supa){
+      try{
+        const { data, error } = await supa.from('ads').select('*').order('created_at', { ascending:true }).limit(500);
+        if(!error && Array.isArray(data)) rows = data;
+      }catch(e){ console.warn('Supabase ad load failed:', e); }
+    }
+    if(!rows.length) rows = getLocalAds();
+    rows.forEach(renderDeployedAd);
+    if(rows.length){ stats.total = Math.max(Number(stats.total)||0, rows.length); saveStats(); renderStats(); }
+  }
+
   function makeInteractive(el){
     let dragging=false, resizing=false, sx=0, sy=0, sl=0, st=0, sw=0, sh=0;
     const down = (e) => {
@@ -179,6 +272,12 @@
         const r = await provider.connect({ onlyIfTrusted:false });
         wallet = r.publicKey.toString();
       } else {
+        if(isMobile()){
+          const target = encodeURIComponent(window.location.href);
+          const ref = encodeURIComponent(window.location.origin);
+          window.location.href = `https://phantom.app/ul/browse/${target}?ref=${ref}`;
+          return;
+        }
         alert('Phantom wallet not found. Install Phantom or open this site in Phantom browser.');
         return;
       }
@@ -233,11 +332,14 @@
     updatePrice();
   }
 
-  function deploy(){
+  async function deploy(){
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
     if(!wallet){ alert('Connect wallet first.'); return; }
     const voucher = cleanVoucher($('#voucherCode').value);
     const name = ($('#adName').value || 'Unnamed War Ad').trim().slice(0,40);
+    const budgetInput = $('#budgetInput');
+    const budgetVal = budgetInput ? Number(budgetInput.value) : 0;
+    if(budgetVal >= 0.5) resizeAdToPrice(budgetVal);
     let p = priceFor(currentAd);
 
     if(!voucher){
@@ -276,6 +378,7 @@
     }
 
     markVoucherUsed(voucher);
+    await saveDeployedAd(deployedAd, p.price);
     $('#voucherCode').value = '';
     stats.total += 1; stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name,p.price); impact(); closeSheet(); currentAd=null; updatePrice();
     alert('Ad deployed and locked for test. Voucher burned. Real paid launch must replace voucher demo with verified USDC payment.');
@@ -285,13 +388,15 @@
   $('#addBtn').onclick = openSheet; $('#mobileAddBtn').onclick = openSheet; $('#closeSheet').onclick = closeSheet;
   $('#closePanel').onclick = closePanel;
   $('#deployBtn').onclick = deploy;
+  $('#budgetInput')?.addEventListener('change', e => { const v = Number(e.target.value); if(v >= 0.5) resizeAdToPrice(v); });
+  $('#budgetInput')?.addEventListener('input', e => { const v = Number(e.target.value); if(v >= 0.5) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('change', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('input', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };
   $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
   $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));
 
-  updateWallet(); renderStats(); updatePrice();
+  loadDeployedAds(); updateWallet(); renderStats(); updatePrice();
 })();
 
 /* PATCH: draggable/playable decorative stickers in sidebar/topbar only */
