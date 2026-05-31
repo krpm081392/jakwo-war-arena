@@ -9,8 +9,10 @@
   let wallet = localStorage.getItem('jakwo_wallet') || '';
   let currentAd = null;
   let stats = JSON.parse(localStorage.getItem('jakwo_stats') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
+  let chatChannel = null;
   const ADS_KEY = 'jakwo_deployed_ads_v1';
-  const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0 || ('ontouchstart' in window);
+  const esc = (v) => String(v || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const supa = (() => {
     try {
       const url = config.supabaseUrl || config.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -69,12 +71,21 @@
     $('#latestWar').textContent = stats.latest || 'None';
     $('#topWarlord').textContent = stats.top || 'None';
   }
+  function manualBudgetValue(){
+    const input = $('#budgetInput');
+    const v = input ? Number(input.value) : 0;
+    return Number.isFinite(v) && v >= 0.5 ? Math.max(0.5, Math.min(1000000, v)) : 0;
+  }
   function priceFor(el){
-    if(!el) return 0.5;
-    const arenaArea = arena.clientWidth * arena.scrollHeight;
-    const adArea = el.offsetWidth * el.offsetHeight;
+    if(!el) return {coverage:.1, price:.5};
+    const arenaArea = Math.max(1, arena.clientWidth * arena.scrollHeight);
+    const adArea = Math.max(1, el.offsetWidth * el.offsetHeight);
     const coverage = Math.min(100, Math.max(.01, (adArea / arenaArea) * 100));
-    const price = Math.max(.5, Math.min(1000000, 0.5 + Math.pow(coverage/100, 2.4) * 999999.5));
+    let price = Math.max(.5, Math.min(1000000, 0.5 + Math.pow(coverage/100, 2.4) * 999999.5));
+    if(el.dataset.budgetMode === '1'){
+      const b = manualBudgetValue();
+      if(b) price = b;
+    }
     return {coverage, price};
   }
   function activeVoucherValue(){
@@ -84,7 +95,7 @@
   function updatePrice(){
     const p = currentAd ? priceFor(currentAd) : {coverage:.1, price:.5};
     const vv = currentAd ? activeVoucherValue() : 0;
-    const displayPrice = vv || p.price;
+    const displayPrice = Math.max(0.5, Math.min(1000000, vv || p.price || 0.5));
     $('#costText').textContent = `${displayPrice.toFixed(2)} USDC`;
     $('#coverageText').textContent = `${p.coverage.toFixed(2)}%`;
     $('#sheetPrice').textContent = `${displayPrice.toFixed(2)} USDC`;
@@ -113,17 +124,22 @@
       const send = panel.querySelector('#chatSend');
       const messages = panel.querySelector('#chatMessages');
       const localChatRows = () => { try { return JSON.parse(localStorage.getItem('jakwo_chat') || '[]'); } catch(_e){ return []; } };
+      const normalizeChat = (r) => ({ wallet: r.wallet || 'Anon', text: r.message || r.text || '', at: r.created_at || r.at || '' });
+      const drawRows = (rows) => {
+        messages.innerHTML = rows.length ? rows.map(r => `<p><b>${esc(r.wallet)}</b>: ${esc(r.text)}</p>`).join('') : '<p><b>System:</b> Connect wallet to join the war chat.</p>';
+        messages.scrollTop = messages.scrollHeight;
+      };
       const renderChat = async () => {
         let rows = [];
         if(supa){
           try{
-            const { data, error } = await supa.from('chat_messages').select('*').order('created_at', { ascending:true }).limit(80);
-            if(!error && Array.isArray(data)) rows = data.map(r => ({ wallet: r.wallet, text: r.message }));
+            const { data, error } = await supa.from('chat_messages').select('*').order('created_at', { ascending:true }).limit(100);
+            if(error) throw error;
+            if(Array.isArray(data)) rows = data.map(normalizeChat);
           }catch(e){ console.warn('Supabase chat load failed:', e); }
         }
         if(!rows.length) rows = localChatRows();
-        messages.innerHTML = rows.length ? rows.map(r => `<p><b>${r.wallet}</b>: ${r.text}</p>`).join('') : '<p><b>System:</b> Connect wallet to join the war chat.</p>';
-        messages.scrollTop = messages.scrollHeight;
+        drawRows(rows);
       };
       const sendChat = async () => {
         if(!wallet){ alert('Connect wallet first to chat.'); return; }
@@ -131,15 +147,28 @@
         if(!text) return;
         if(/https?:\/\/|www\.|t\.me|discord\.gg/i.test(text)){ alert('No links allowed in war chat.'); return; }
         const row = { wallet: shortWallet(wallet), text: text.slice(0,160), at: Date.now() };
-        const rows = localChatRows();
-        rows.push(row);
-        localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-80)));
         if(supa){
-          try{ await supa.from('chat_messages').insert({ wallet: row.wallet, message: row.text }); }catch(e){ console.warn('Supabase chat send failed:', e); }
+          try{
+            const { error } = await supa.from('chat_messages').insert({ wallet: row.wallet, message: row.text });
+            if(error) throw error;
+          }catch(e){
+            console.warn('Supabase chat send failed, saving local fallback:', e);
+            const rows = localChatRows(); rows.push(row); localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-80)));
+          }
+        } else {
+          const rows = localChatRows(); rows.push(row); localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-80)));
         }
         input.value = '';
         await renderChat();
       };
+      if(supa){
+        try{
+          if(chatChannel) supa.removeChannel(chatChannel);
+          chatChannel = supa.channel('jakwo-war-chat-live')
+            .on('postgres_changes', { event:'INSERT', schema:'public', table:'chat_messages' }, () => renderChat())
+            .subscribe();
+        }catch(e){ console.warn('Supabase realtime chat failed:', e); }
+      }
       input?.addEventListener('focus', () => panel.classList.add('keyboard-mode'));
       input?.addEventListener('blur', () => panel.classList.remove('keyboard-mode'));
       input?.addEventListener('keydown', e => { if(e.key === 'Enter') sendChat(); });
@@ -163,7 +192,7 @@
     ad.style.left = '14%'; ad.style.top = '18%'; ad.style.width = '40px'; ad.style.height = '40px';
     ad.innerHTML = `<button class="x" title="Remove">×</button><img src="${src}" alt="war ad"><span class="resize"></span>`;
     arena.appendChild(ad);
-    currentAd = ad; const bi=$('#budgetInput'); if(bi) bi.value='0.50'; makeInteractive(ad); updatePrice();
+    currentAd = ad; ad.dataset.budgetMode='1'; const bi=$('#budgetInput'); if(bi) bi.value='0.50'; makeInteractive(ad); updatePrice();
   }
   function getLocalAds(){
     try { return JSON.parse(localStorage.getItem(ADS_KEY) || '[]'); } catch(_e){ return []; }
@@ -215,7 +244,7 @@
     setLocalAds(rows);
     if(supa){
       try{
-        const dbRec = { image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, x: rec.x, y: rec.y, w: rec.w, h: rec.h, locked: true, voucher_code: cleanVoucher($('#voucherCode')?.value || '') || null };
+        const dbRec = { image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, x: rec.x, y: rec.y, w: rec.w, h: rec.h, name: rec.name, locked: true, voucher_code: cleanVoucher($('#voucherCode')?.value || '') || null, tx_signature: el.dataset.tx || null };
         const oldId = rec.id;
         const { data, error } = await supa.from('ads').insert(dbRec).select('id').single();
         if(!error && data?.id){ rec.id = data.id; el.dataset.id = data.id; const updated = getLocalAds().filter(a => a.id !== oldId && a.id !== data.id); updated.push({...rec, id:data.id}); setLocalAds(updated); }
@@ -243,7 +272,7 @@
       if(t.classList.contains('x')){ el.remove(); currentAd=null; updatePrice(); return; }
       const p = e.touches ? e.touches[0] : e;
       sx=p.clientX; sy=p.clientY; sl=parseFloat(el.style.left)||0; st=parseFloat(el.style.top)||0; sw=el.offsetWidth; sh=el.offsetHeight;
-      resizing = t.classList.contains('resize'); dragging = !resizing; el.setPointerCapture?.(e.pointerId||0);
+      resizing = t.classList.contains('resize'); dragging = !resizing; if(resizing) el.dataset.budgetMode='0'; el.setPointerCapture?.(e.pointerId||0);
     };
     const move = (e) => {
       if(el.classList.contains('locked')) return;
@@ -320,6 +349,7 @@
   }
   function resizeAdToPrice(target){
     if(!currentAd || !target) return;
+    currentAd.dataset.budgetMode='1';
     const arenaArea = arena.clientWidth * arena.scrollHeight;
     const clamped = Math.max(0.5, Math.min(1000000, target));
     let coverage = Math.pow((clamped - 0.5) / 999999.5, 1 / 2.4) * 100;
@@ -484,7 +514,7 @@
   $('#addBtn').onclick = openSheet; $('#mobileAddBtn').onclick = openSheet; $('#closeSheet').onclick = closeSheet;
   $('#closePanel').onclick = closePanel;
   $('#deployBtn').onclick = deploy;
-  $('#budgetInput')?.addEventListener('change', e => { const v = Number(e.target.value); if(v >= 0.5) resizeAdToPrice(v); });
+  $('#budgetInput')?.addEventListener('change', e => { let v = Number(e.target.value); if(!Number.isFinite(v) || v < 0.5) v = 0.5; e.target.value = v.toFixed(2); resizeAdToPrice(v); });
   $('#budgetInput')?.addEventListener('input', e => { const v = Number(e.target.value); if(v >= 0.5) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('change', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('input', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
