@@ -170,3 +170,6 @@
 .top-w1{left:150px;top:6px;transform:rotate(-8deg) scale(.58)}.top-w2{left:245px;top:4px;transform:rotate(5deg) scale(.58)}.top-w3{left:345px;top:7px;transform:rotate(-4deg) scale(.58)}.top-w4{left:455px;top:5px;transform:rotate(6deg) scale(.58)}.top-w5{right:250px;top:7px;transform:rotate(-5deg) scale(.58)}
 .side-w1{left:26px;top:235px;transform:rotate(-7deg) scale(.78)}.side-w2{left:24px;top:360px;transform:rotate(6deg) scale(.78)}.side-w3{left:26px;top:490px;transform:rotate(-5deg) scale(.78)}.side-w4{left:24px;top:625px;transform:rotate(7deg) scale(.78)}
 @media(max-width:800px){.top-deco-layer,.side-deco-layer{display:none}}
+
+/* PATCH: use real Wojak images inside existing playable top/left cards only */
+.wojak-card img.face{object-fit:cover;object-position:center;display:block;font-size:0;padding:0;overflow:hidden} .wojak-card img.face{height:auto;min-height:0}
