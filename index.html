@@ -42,17 +42,11 @@
       <div class="battle-bg"></div>
       <div class="cost-badge"><small>LIVE WAR COST</small><strong id="liveCost">0.50 USDC</strong><b>LIVE</b></div>
 
-      <div class="meme-card c1" data-name="COPE HARDER"><span>COPE HARDER</span><div class="wojak cry">☹</div></div>
-      <div class="meme-card c2" data-name="WAGMI"><span>WAGMI</span><div class="wojak cool">😎</div></div>
-      <div class="meme-card c3" data-name="RUG SEASON"><span>RUG SEASON</span><div class="wojak pepe">🐸</div></div>
-      <div class="meme-card c4" data-name="EXIT LIQUIDITY"><span>EXIT LIQUIDITY</span><div class="wojak cool">🕴</div></div>
-      <div class="meme-card c5" data-name="DEGEN BRAIN"><span>DEGEN BRAIN</span><div class="wojak brain">🧠</div></div>
-      <div class="meme-card c6" data-name="MARKET PAIN"><span>MARKET PAIN</span><div class="chart">↘</div><div class="wojak cry small">😭</div></div>
-      <div class="meme-card c7" data-name="OLD WAR"><span>OLD WAR</span><div class="wojak soldier">🪖</div></div>
-      <div class="meme-card c8" data-name="WE ARE EARLY"><span>WE ARE EARLY</span><div class="wojak pepe">🐸</div></div>
-      <div class="meme-card c9" data-name="HODL OR DIE"><span>HODL OR DIE</span><div class="wojak">😐</div></div>
-      <div class="meme-card c10" data-name="NGMI"><span>NGMI</span><div class="wojak cry">😵</div></div>
-      <div class="graffiti">BUY<br>PLACE<br><b>BLOCK</b><br>REPEAT</div>
+      <div class="empty-warfield" id="emptyWarfield">
+        <h1>BE THE FIRST WARLORD</h1>
+        <p>No fake posters. This battlefield starts empty and fills only with real wars.</p>
+        <button class="mini-cta" id="emptyPlaceBtn">＋ ADD WAR PHOTO</button>
+      </div>
 
       <div id="userAd" class="placed-ad hidden">
         <button id="removeAd" class="remove">×</button>
@@ -67,6 +61,7 @@
     <nav class="mobile-nav">
       <button data-panel="rules">❔<span>RULES</span></button>
       <button data-panel="chat">💬<span>CHAT</span></button>
+      <button id="mobilePlaceBtn" class="mobile-add">＋<span>ADD</span></button>
       <a href="story.html">📖<span>STORY</span></a>
     </nav>
   </main>
@@ -85,8 +80,8 @@
       <div class="coverage-line"><span>Coverage</span><b id="coverageText">1%</b></div>
       <input id="coverageSlider" class="slider" type="range" min="0.0385" max="100" value="1" step="0.1">
       <div class="price-row"><span>Price</span><strong id="priceText">0.50 USDC</strong></div>
-      <button id="deployBtn" class="deploy">DEPLOY TO WAR</button>
-      <button id="confirmBtn" class="deploy confirm hidden">CONFIRM DEPLOY</button>
+      <button id="deployBtn" class="deploy">PREVIEW ON WARFIELD</button>
+      <button id="confirmBtn" class="deploy confirm hidden">PAY / VOUCHER DEPLOY</button>
       <p class="note">Drag anywhere. Pinch/slider resize. 100% arena = 1,000,000 USDC.</p>
     </div>
   </section>

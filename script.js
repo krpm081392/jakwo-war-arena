@@ -39,7 +39,7 @@ function closeSheet(){ $('#sheet')?.classList.remove('open'); }
 function loadImage(file){
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = e => { state.image = e.target.result; $('#adPreview').src = state.image; $('#userAd').classList.remove('hidden'); closeSheet(); updateAdSize(); };
+  reader.onload = e => { state.image = e.target.result; $('#adPreview').src = state.image; $('#userAd').classList.remove('hidden'); $('#emptyWarfield')?.classList.add('hidden'); closeSheet(); updateAdSize(); };
   reader.readAsDataURL(file);
 }
 function updateAdSize(){
@@ -64,10 +64,12 @@ function deploy(){
   $('#deployBtn').textContent='PREVIEW ON ARENA';
 }
 function confirmDeploy(){
+  const voucher = ($('#voucherCode')?.value || '').trim();
+  if(!voucher && !confirm('This is the payment step. In final launch this opens Phantom USDC payment. Continue DEMO deploy for testing only?')) return;
   if(state.coverage >= 100){ alert('🚨 TSUNAMI ALERT: 1M DOMINATOR ACTIVE. Arena lockdown would start now.'); }
   impact();
   closeSheet();
-  state.deployed = true;
+  state.deployed = true; $('#userAd')?.classList.add('deployed','locked');
   $('#confirmBtn').classList.add('hidden');
   $('#deployBtn').textContent='DEPLOY TO WAR';
   const count = Number(localStorage.getItem('jakwo_ads')||0)+1;
@@ -85,7 +87,7 @@ function impact(){
 function panel(type){
   const content = $('#panelContent');
   const box = {
-    rules:`<h2>RULES OF THE ARENA</h2><p>Ads are permanent. No refunds. No edit after deploy. Ads can be covered by newer ads. No phishing, malware, illegal content, hate, impersonation, or scam links.</p>`,
+    rules:`<h2>RULES OF THE ARENA</h2><p><b>1.</b> Ads are permanent after deployment.<br><b>2.</b> No refunds after publish.<br><b>3.</b> No edits, no moving, no deleting after deploy.<br><b>4.</b> Ads can be covered by newer ads.<br><b>5.</b> Links are clicked at user risk.<br><b>6.</b> No phishing, malware, porn, hate, illegal content, impersonation, or scam links.<br><b>7.</b> Rule-breaking ads can be removed without refund.</p>`,
     chat:`<h2>WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><input placeholder='Connect wallet to chat' style='width:100%;padding:14px;background:#080a0d;color:#fff;border:1px solid #333;border-radius:8px'>`,
     lords:`<h2>TOP WARLORDS</h2><p>#1 NONE YET<br>#2 OPEN<br>#3 OPEN</p>`
   }[type] || '<h2>JAKWO</h2>';
@@ -108,11 +110,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('#xLink') && ($('#xLink').href = cfg.TWITTER || '#'); $('#tgLink') && ($('#tgLink').href = cfg.TELEGRAM || '#');
   syncWallet(); updatePrice(); $('#totalAds') && ($('#totalAds').textContent = localStorage.getItem('jakwo_ads') || '0');
   $('#connectBtn')?.addEventListener('click', connectWallet);
-  $('#placeAdBtn')?.addEventListener('click', openSheet); $('#closeSheet')?.addEventListener('click', closeSheet);
+  $('#placeAdBtn')?.addEventListener('click', openSheet); $('#mobilePlaceBtn')?.addEventListener('click', openSheet); $('#emptyPlaceBtn')?.addEventListener('click', openSheet); $('#closeSheet')?.addEventListener('click', closeSheet);
   $('#imageInput')?.addEventListener('change',e=>loadImage(e.target.files[0])); $('#fileInput')?.addEventListener('change',e=>loadImage(e.target.files[0]));
   $('#coverageSlider')?.addEventListener('input',e=>{ state.coverage=Number(e.target.value); updatePrice(); updateAdSize(); });
   $('#deployBtn')?.addEventListener('click', deploy); $('#confirmBtn')?.addEventListener('click', confirmDeploy);
-  $('#removeAd')?.addEventListener('click',()=>{$('#userAd').classList.add('hidden'); state.image='';});
+  $('#removeAd')?.addEventListener('click',()=>{$('#userAd').classList.add('hidden'); $('#emptyWarfield')?.classList.remove('hidden'); state.image='';});
   $$('.side-rail button,.mobile-nav button').forEach(b=>b.addEventListener('click',()=>panel(b.dataset.panel)));
   $('#closePanel')?.addEventListener('click',()=>$('#panel').classList.add('hidden'));
   $$('.meme-card').forEach(card=>{ makeDraggable(card); card.addEventListener('click',()=>{card.style.transition='transform .45s'; card.style.transform=`rotate(${Math.random()*40-20}deg) scale(${.95+Math.random()*.2})`; setTimeout(()=>card.style.transition='',500);}); });
