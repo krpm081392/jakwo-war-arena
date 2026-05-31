@@ -63,7 +63,7 @@ function rulesHTML(){return `<div class="rules-text"><h2>📜 MEME WAR ADS ARENA
 <h3>8. Liability Disclaimer</h3><p>Meme War Ads Arena is a public user-generated advertising platform. All ads, images, and external links are uploaded and managed by users. We do not verify, approve, or validate the accuracy, safety, or legitimacy of any advertisement. Advertisers are fully responsible for their uploaded content. Users click on ads at their own risk. Meme War Ads Arena is not liable for any financial loss, scam, or damage caused by user-posted content or links.</p>
 <h3>9. Reporting Ads</h3><p>Users may report illegal content, unsafe links, hate, scams, or explicit material. Reported ads may be reviewed and removed if confirmed to violate content policies. Refunds will not be given for removed ads.</p>
 <h3>10. Final Rule</h3><blockquote>Buy. Place. Block. Repeat. Once your ad enters the arena, it lives there forever — visible or buried, but never removed.</blockquote></div>`}
-function storyHTML(){return `<h2>📖 The Story</h2><p>The internet became a battlefield. Memes became weapons. Attention became territory.</p><p>JAKWO is the arena where every image becomes history. You do not rent space. You claim it.</p><p><a class="btn" href="story.html">Open full story</a></p>`}
+function storyHTML(){return `<h2>📖 The Story of Wojak & JAKWO</h2><p>Wojak became the face of the internet: pain, hope, late-night scrolling, red candles, and silent dreams.</p><p>Jakwo is the hidden self behind that face — the one that refused to disappear inside the feed.</p><p>So the arena was built: a permanent battlefield where memes, ads, logos, and messages fight for attention.</p><p><b>Memes became weapons. Attention became territory. Ads became war.</b></p><p><a class="btn" href="story.html">Open full story</a></p>`}
 function lordsHTML(){const ads=getAds(); const by={}; ads.forEach(a=>{by[a.wallet||'unknown']=(by[a.wallet||'unknown']||0)+Number(a.amount||0)}); const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([w,a],i)=>`<p><b>#${i+1}</b> ${shortWallet(w)} — ${a.toFixed(2)} USDC</p>`).join('')||'<p>No warlords yet.</p>';return `<h2>🏆 Top Warlords</h2>${rows}`}
 function chatHTML(){return `<h2>💬 War Chat</h2><div id="chatMessages" class="rules-text"><p>Connect wallet to send messages.</p></div><input id="chatInput" class="input" placeholder="Troll message, no links"><button id="sendChat" class="btn primary" style="margin-top:10px">Send</button>`}
 function bindChat(){ $('sendChat').addEventListener('click',()=>{ if(!state.wallet) return alert('Connect wallet first.'); const msg=$('chatInput').value.trim(); if(!msg) return; if(/https?:\/\//i.test(msg)) return alert('No links in chat.'); const box=$('chatMessages'); box.innerHTML += `<p><b>${shortWallet(state.wallet)}:</b> ${escapeHTML(msg)}</p>`; $('chatInput').value=''; });}
@@ -84,22 +84,39 @@ function setDraftSize(w,h){ if(!state.draft)return; state.draft.w=w; state.draft
 function applySliderSize(){ if(!state.draft)return; const pct=Number($('sizeSlider').value)/100; const area=1200*900*pct; const side=Math.sqrt(area); setDraftSize(side,side); }
 function calcPrice(){ if(!state.draft)return cfg.MIN_PRICE||.5; const cov=Math.min(1,(state.draft.w*state.draft.h)/(1200*900)); const min=cfg.MIN_PRICE||.5,max=cfg.MAX_PRICE||1000000; return min + Math.pow(cov,2.15)*(max-min); }
 function updatePrice(){ const price=calcPrice(); const cov=state.draft?((state.draft.w*state.draft.h)/(1200*900)*100):0; $('liveCost').textContent=price.toLocaleString(undefined,{maximumFractionDigits:2})+' USDC'; $('sheetPrice').textContent=price.toLocaleString(undefined,{maximumFractionDigits:2})+' USDC'; $('coverageText').textContent=cov.toFixed(2)+'%'; }
+function cleanAdName(){
+  const n = ($('adName')?.value || '').trim();
+  return n ? n.slice(0,40) : 'Unnamed War Ad';
+}
+function announceWar(ad){
+  const name = escapeHTML(ad.name || 'Unnamed War Ad');
+  const amount = Number(ad.amount || 0).toLocaleString(undefined,{maximumFractionDigits:2});
+  const msg = `🚨 ${name} launched a new war ad • ${amount} USDC • Buy. Place. Block. Repeat. • `;
+  const t = $('tickerTrack');
+  if(t) t.textContent = msg + t.textContent;
+}
+
 function deleteDraft(){ if(state.draft?.el) state.draft.el.remove(); state.draft=null; updatePrice(); }
 function deployDraft(){
   if(!state.draft) return alert('Choose a photo first.');
   if(!state.wallet) return alert('Connect Phantom first.');
   const voucher=$('voucherCode').value.trim();
   const price=calcPrice();
-  const ok = voucher ? confirm('Use voucher and deploy? Code will be burned in production.') : confirm(`Production must open Phantom payment for ${price.toFixed(2)} USDC. For UI test, lock this ad now?`);
+  const name=cleanAdName();
+  if(!voucher){
+    alert(`Payment required: ${price.toFixed(2)} USDC. This static test build will NOT deploy paid ads without real Phantom/Solana payment verification.`);
+    return;
+  }
+  const ok = confirm('Use voucher and deploy this ad? In production, code is checked and burned.');
   if(!ok) return;
-  const ad={id:Date.now(),image:state.draft.url,link:$('adLink').value.trim(),wallet:state.wallet,amount:voucher?0:price,x:state.draft.x,y:state.draft.y,w:state.draft.w,h:state.draft.h,created_at:new Date().toISOString(),voucher_code:voucher||''};
+  const ad={id:Date.now(),name,image:state.draft.url,link:$('adLink').value.trim(),wallet:state.wallet,amount:0,x:state.draft.x,y:state.draft.y,w:state.draft.w,h:state.draft.h,created_at:new Date().toISOString(),voucher_code:voucher};
   const ads=getAds(); ads.push(ad); localStorage.setItem('jakwo_ads',JSON.stringify(ads));
-  addAdToDom(ad); deleteDraft(); closeSheet(); updateStats(); warImpact(price); alert('Ad locked in demo state. Production payment verification still required before public launch.');
+  addAdToDom(ad); announceWar(ad); deleteDraft(); closeSheet(); updateStats(); warImpact(price); alert('Voucher ad locked. Production must verify and burn voucher in Supabase.');
 }
 function getAds(){ try{return JSON.parse(localStorage.getItem('jakwo_ads')||'[]')}catch{return[]} }
 function loadLocalAds(){ getAds().forEach(addAdToDom); updateStats(); }
-function addAdToDom(ad){ const el=document.createElement('a'); el.className='war-ad locked'; el.href=ad.link||'#'; el.target='_blank'; el.style.left=ad.x+'px'; el.style.top=ad.y+'px'; el.style.width=ad.w+'px'; el.style.height=ad.h+'px'; el.style.zIndex=100+Number(ad.id||0)%100000; el.title=`${Number(ad.amount||0).toFixed(2)} USDC • ${shortWallet(ad.wallet)}`; el.innerHTML=`<img src="${ad.image}">`; $('adLayer').appendChild(el); $('emptyCallout').style.display='none'; }
-function updateStats(){ const ads=getAds(); $('totalAds').textContent=ads.length; const vol=ads.reduce((s,a)=>s+Number(a.amount||0),0); $('usdcVolume').textContent=vol.toLocaleString(undefined,{maximumFractionDigits:2}); $('latestWar').textContent=ads.length?shortWallet(ads[ads.length-1].wallet):'None'; const top={}; ads.forEach(a=>top[a.wallet]=(top[a.wallet]||0)+Number(a.amount||0)); const tw=Object.entries(top).sort((a,b)=>b[1]-a[1])[0]; $('topWarlord').textContent=tw?shortWallet(tw[0]):'None'; if(ads.length)$('emptyCallout').style.display='none'; }
+function addAdToDom(ad){ const el=document.createElement('a'); el.className='war-ad locked'; el.href=ad.link||'#'; el.target='_blank'; el.style.left=ad.x+'px'; el.style.top=ad.y+'px'; el.style.width=ad.w+'px'; el.style.height=ad.h+'px'; el.style.zIndex=100+Number(ad.id||0)%100000; el.title=`${ad.name||'War Ad'} • ${Number(ad.amount||0).toFixed(2)} USDC`; el.innerHTML=`<img src="${ad.image}">`; $('adLayer').appendChild(el); $('emptyCallout').style.display='none'; }
+function updateStats(){ const ads=getAds(); $('totalAds').textContent=ads.length; const vol=ads.reduce((s,a)=>s+Number(a.amount||0),0); $('usdcVolume').textContent=vol.toLocaleString(undefined,{maximumFractionDigits:2}); $('latestWar').textContent=ads.length?(ads[ads.length-1].name||'War Ad'):'None'; const top={}; ads.forEach(a=>top[a.wallet]=(top[a.wallet]||0)+Number(a.amount||0)); const tw=Object.entries(top).sort((a,b)=>b[1]-a[1])[0]; $('topWarlord').textContent=tw?shortWallet(tw[0]):'None'; if(ads.length)$('emptyCallout').style.display='none'; }
 function warImpact(price){ document.body.classList.add('impact'); if(navigator.vibrate) navigator.vibrate(price>100000?[250,80,250,80,250]:[80]); setTimeout(()=>document.body.classList.remove('impact'),900); if(price>=1000000) alert('🚨 TSUNAMI ALERT: ARENA DOMINATOR DETECTED. Lockdown mode should trigger in production.'); }
 function escapeHTML(s){return s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 init();
@@ -130,13 +147,5 @@ init();
     if (placeDesktop) placeDesktop.onclick = function(e){ e.preventDefault(); e.stopPropagation(); if (typeof openSheet === 'function') openSheet(); };
     if (placeMobile) placeMobile.onclick = function(e){ e.preventDefault(); e.stopPropagation(); if (typeof openSheet === 'function') openSheet(); };
 
-    // Admin shortcut: click JAKWO logo 5 times.
-    const brand = document.querySelector('.brand');
-    let taps = 0;
-    if (brand) brand.addEventListener('click', function(e){
-      taps++;
-      if (taps >= 5) { e.preventDefault(); location.href = 'admin.html'; }
-      setTimeout(function(){ taps = 0; }, 1500);
-    });
   });
 })();
