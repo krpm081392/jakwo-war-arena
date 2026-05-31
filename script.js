@@ -80,16 +80,38 @@
       rules: rulesHTML,
       story: storyHTML,
       leaderboard: `<h2>🏆 TOP WARLORDS</h2><p>No confirmed paid warlords yet.</p><p>Leaderboard will rank advertisers by real paid volume.</p>`,
-      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><input class="wallet-required" placeholder="Connect wallet to chat" style="width:100%;height:44px;padding:10px">`
+      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
     };
     panel.dataset.type = type;
     panelContent.innerHTML = map[type] || '';
     panel.classList.remove('hidden');
     updateWallet();
     if(type === 'chat'){
-      const input = panel.querySelector('input');
+      const input = panel.querySelector('#chatInput');
+      const send = panel.querySelector('#chatSend');
+      const messages = panel.querySelector('#chatMessages');
+      const renderChat = () => {
+        const rows = JSON.parse(localStorage.getItem('jakwo_chat') || '[]');
+        messages.innerHTML = rows.length ? rows.map(r => `<p><b>${r.wallet}</b>: ${r.text}</p>`).join('') : '<p><b>System:</b> Connect wallet to join the war chat.</p>';
+        messages.scrollTop = messages.scrollHeight;
+      };
+      const sendChat = () => {
+        if(!wallet){ alert('Connect wallet first to chat.'); return; }
+        const text = (input.value || '').trim();
+        if(!text) return;
+        if(/https?:\/\/|www\.|t\.me|discord\.gg/i.test(text)){ alert('No links allowed in war chat.'); return; }
+        const rows = JSON.parse(localStorage.getItem('jakwo_chat') || '[]');
+        rows.push({ wallet: shortWallet(wallet), text: text.slice(0,160), at: Date.now() });
+        localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-50)));
+        input.value = '';
+        renderChat();
+      };
       input?.addEventListener('focus', () => panel.classList.add('keyboard-mode'));
       input?.addEventListener('blur', () => panel.classList.remove('keyboard-mode'));
+      input?.addEventListener('keydown', e => { if(e.key === 'Enter') sendChat(); });
+      send?.addEventListener('click', sendChat);
+      renderChat();
+      updateWallet();
     }
   }
   function closePanel(){ panel.classList.add('hidden'); }

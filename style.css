@@ -37,3 +37,20 @@
   .deploy{height:44px;}
   .hint{font-size:10px;}
 }
+
+/* PATCH 2: compact add-photo panel and working chat layout only */
+.chat-messages{max-height:180px;overflow:auto;background:#fff7dc;border:2px solid #8c6336;border-radius:8px;padding:8px;margin:8px 0;color:#261409}
+.chat-messages p{margin:6px 0;font-weight:800;line-height:1.25}.chat-row{display:flex;gap:6px}.chat-row input{flex:1;height:42px;padding:0 10px;border:2px solid #8c6336;border-radius:6px}.chat-send{height:42px;border:2px solid #4b2511;background:#a32018;color:#fff;border-radius:6px;font-weight:1000;padding:0 12px}.chat-send:disabled,.chat-row input:disabled{opacity:.6;cursor:not-allowed}
+@media (min-width:801px){
+  .sheet{left:auto;right:20px;bottom:-110%;transform:none;width:360px;max-height:72vh;overflow:auto;border-radius:14px;}
+  .sheet.open{bottom:86px;}
+  .sheet h2{font-size:22px;margin:8px 0}.upload-box{height:62px}.sheet input{height:38px}.deploy{height:42px}
+}
+@media (max-width:800px){
+  .sheet{left:auto;right:8px;bottom:-110%;transform:none;width:82vw;max-width:340px;max-height:58vh;overflow:auto;border-radius:14px 14px 0 0;padding:14px;}
+  .sheet.open{bottom:61px;}
+  .sheet h2{font-size:19px;margin:6px 0}.upload-box{height:54px;margin:8px 0}.sheet input{height:36px;margin:5px 0}.deploy{height:42px}.hint{font-size:10px}.price-line{margin:5px 0}
+  .panel[data-type="chat"]{top:auto!important;bottom:64px!important;left:10px!important;right:10px!important;transform:none!important;width:auto!important;max-height:46vh!important;overflow:auto!important;padding:16px!important;}
+  .panel[data-type="chat"].keyboard-mode{bottom:10px!important;max-height:42vh!important;}
+  .chat-messages{max-height:110px}.chat-row input{height:40px}.chat-send{height:40px}
+}
