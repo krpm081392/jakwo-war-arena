@@ -1,1 +1,1 @@
-{"cleanUrls":true,"trailingSlash":false,"rewrites":[{"source":"/arena","destination":"/arena.html"},{"source":"/story","destination":"/story.html"},{"source":"/admin","destination":"/admin.html"}]}
+{"version":2,"routes":[{"src":"/(.*)","dest":"/$1"}]}
