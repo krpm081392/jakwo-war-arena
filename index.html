@@ -2,99 +2,79 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>JAKWO War Ads Arena</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Meme War Ads Arena</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="arena-body">
-  <div id="warImpact" class="war-impact"></div>
-
-  <header class="top-shell">
-    <div class="top-row">
-      <a class="brand" href="index.html">JAKWO <span>WAR ADS ARENA</span></a>
-      <div class="top-actions">
-        <button id="connectWallet" class="btn phantom">Connect Phantom</button>
-        <a id="twitterLink" class="btn mini" target="_blank" rel="noreferrer">X</a>
-        <a id="telegramLink" class="btn mini" target="_blank" rel="noreferrer">TG</a>
-      </div>
-    </div>
-    <div class="ticker-row">
-      <div class="live-label">LIVE</div>
-      <div class="ticker-clip"><div id="tickerTrack" class="ticker-track">Buy. Place. Block. Repeat. • Every ad is permanent • Bigger space costs more • New ads can cover old ads • No refunds after deployment •</div></div>
-    </div>
-    <div class="stats-row">
-      <div class="stat"><b id="totalAds">0</b><span>Total Ads</span></div>
-      <div class="stat"><b id="usdcVolume">0.00</b><span>USDC in Arena</span></div>
-      <div class="stat"><b id="latestWar">None</b><span>Latest War</span></div>
-      <div class="stat"><b id="topWarlord">None</b><span>Top Warlord</span></div>
+<body>
+  <div id="impactFlash"></div>
+  <header class="topbar">
+    <div class="brand"><span>JAKWO</span><small>MEME WAR ADS ARENA</small></div>
+    <div class="top-actions">
+      <button id="connectBtn" class="wallet">CONNECT</button>
+      <a id="xLink" class="square" href="https://x.com/jakw0o" target="_blank" rel="noopener">𝕏</a>
+      <a id="tgLink" class="square tg" href="https://t.me/+hJ-0IQGfYTRmYjM0" target="_blank" rel="noopener">TG</a>
     </div>
   </header>
 
-  <main class="app-shell">
-    <aside class="side-nav desktop-only">
-      <button class="side-btn" data-panel="rules">📜 Rules</button>
-      <button class="side-btn" data-panel="chat">💬 War Chat</button>
-      <button class="side-btn" data-panel="story">📖 Story</button>
-      <button class="side-btn" data-panel="lords">🏆 Leaderboard</button>
-    </aside>
+  <section class="ticker-wrap">
+    <b>LIVE</b>
+    <div class="ticker"><span id="tickerText">Buy. Place. Block. Repeat. • Every ad is permanent • Bigger space costs more • New ads can cover old ads • No refunds after deployment •</span></div>
+  </section>
 
-    <section id="arenaViewport" class="arena-viewport">
-      <div class="empty-callout" id="emptyCallout">
-        <h1>THE ARENA IS WAITING</h1>
-        <p>Upload your image. Resize freely. Pay. Lock it forever. Future ads can only cover it.</p>
+  <section class="stats">
+    <div><strong id="totalAds">0</strong><span>TOTAL ADS</span></div>
+    <div><strong id="arenaVolume">0.00</strong><span>USDC IN ARENA</span></div>
+    <div><strong id="latestWar">None</strong><span>LATEST WAR</span></div>
+    <div><strong id="topWarlord">None</strong><span>TOP WARLORD</span></div>
+  </section>
+
+  <main class="app">
+    <nav class="sidebar">
+      <button data-panel="rules">📜 <span>Rules</span></button>
+      <button data-panel="chat">💬 <span>War Chat</span></button>
+      <button data-panel="story">📖 <span>Story</span></button>
+      <button data-panel="leaderboard">🏆 <span>Leaderboard</span></button>
+    </nav>
+
+    <section id="arena" class="arena">
+      <div class="empty-card" id="emptyCard">
+        <h1>BE THE FIRST WARLORD</h1>
+        <p>Upload your image. Resize freely. Pay or use voucher. Lock it forever. Future ads can only cover it.</p>
       </div>
-      <div id="adLayer" class="ad-layer"></div>
-      <div id="draftLayer" class="draft-layer"></div>
     </section>
+
+    <aside class="cost-badge"><small>WAR COST</small><b id="costText">0.50 USDC</b></aside>
+    <button id="addBtn" class="add-btn">+ ADD WAR PHOTO</button>
   </main>
 
-  <div class="live-cost" id="liveCostBox"><span>War Cost</span><b id="liveCost">0.50 USDC</b></div>
-
-  <button id="placeAdBtn" class="place-ad desktop-place">+ ADD WAR PHOTO</button>
-
-  <nav class="bottom-nav mobile-only">
+  <nav class="mobile-nav">
     <button data-panel="rules">📜<span>Rules</span></button>
     <button data-panel="chat">💬<span>Chat</span></button>
-    <button id="mobilePlaceAd">➕<span>Add</span></button>
+    <button id="mobileAddBtn">＋<span>Add</span></button>
     <button data-panel="story">📖<span>Story</span></button>
   </nav>
 
-  <section id="panel" class="panel hidden">
-    <div class="panel-card">
-      <button id="closePanel" class="close">×</button>
-      <div id="panelContent"></div>
-    </div>
+  <section id="sheet" class="sheet" aria-hidden="true">
+    <div class="grab"></div>
+    <button id="closeSheet" class="close">×</button>
+    <h2>Place Your Weapon</h2>
+    <label class="upload-box">
+      <input id="imageInput" type="file" accept="image/*" hidden />
+      <span>📷 Choose Photo</span>
+    </label>
+    <input id="adName" placeholder="Ad name for LIVE ticker" maxlength="40" />
+    <input id="adLink" placeholder="External link (optional)" />
+    <input id="voucherCode" placeholder="Voucher code (optional for testing)" />
+    <div class="price-line"><span>Coverage</span><b id="coverageText">0.1%</b></div>
+    <div class="price-line"><span>Price</span><b id="sheetPrice">0.50 USDC</b></div>
+    <p class="hint">Before deploy: move, resize, delete, change. After successful deploy: locked forever.</p>
+    <button id="deployBtn" class="deploy">DEPLOY TO WAR</button>
   </section>
 
-  <section id="adSheet" class="bottom-sheet hidden">
-    <div class="sheet-card">
-      <div class="sheet-head">
-        <h2>Place Your War Photo</h2>
-        <button id="closeSheet" class="close">×</button>
-      </div>
-      <p class="hint">Before deploy: move, resize, delete, change. After deploy: locked forever.</p>
-      <label class="upload-drop">
-        <input id="imageInput" type="file" accept="image/*" />
-        <strong>Choose Photo</strong>
-        <small>PNG, JPG, GIF</small>
-      </label>
-      <label class="field-label">Ad Name</label>
-      <input id="adName" class="input" maxlength="40" placeholder="Example: PEPE ARMY, KR BOT, DOGE INVASION" />
-      <label class="field-label">Ad Link</label>
-      <input id="adLink" class="input" placeholder="https://your-link.com" />
-      <label class="field-label">Voucher Code optional</label>
-      <input id="voucherCode" class="input" placeholder="JAKWO-XXXX" />
-      <div class="sheet-grid">
-        <div><span>Coverage</span><b id="coverageText">0.01%</b></div>
-        <div><span>Price</span><b id="sheetPrice">0.50 USDC</b></div>
-      </div>
-      <input id="sizeSlider" class="slider" type="range" min="1" max="100" value="8" />
-      <div class="sheet-actions">
-        <button id="deleteDraft" class="btn danger">Delete Draft</button>
-        <button id="deployBtn" class="btn primary">Pay & Deploy</button>
-      </div>
-      <p class="note">Payment verification is the production gate. This UI locks only after a confirmed deploy state.</p>
-    </div>
+  <section id="panel" class="panel hidden">
+    <button id="closePanel" class="close">×</button>
+    <div id="panelContent"></div>
   </section>
 
   <script src="config.js"></script>

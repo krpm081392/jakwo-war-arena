@@ -1,151 +1,155 @@
-const cfg = window.JAKWO_CONFIG || {};
-const state = { wallet: localStorage.getItem('jakwo_wallet') || '', draft: null, dragging: null, resizing: null, offsetX:0, offsetY:0 };
-const $ = (id)=>document.getElementById(id);
-const panelContent = $('panelContent');
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const arena = $('#arena');
+  const sheet = $('#sheet');
+  const panel = $('#panel');
+  const panelContent = $('#panelContent');
+  const config = window.JAKWO_CONFIG || {};
+  let wallet = localStorage.getItem('jakwo_wallet') || '';
+  let currentAd = null;
+  let stats = JSON.parse(localStorage.getItem('jakwo_stats') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
 
-function init(){
-  $('twitterLink').href = cfg.TWITTER || '#';
-  $('telegramLink').href = cfg.TELEGRAM || '#';
-  updateWalletUI();
-  loadLocalAds();
-  bindEvents();
-  updateStats();
-}
-function bindEvents(){
-  $('connectWallet')?.addEventListener('click', connectWallet);
-  $('placeAdBtn')?.addEventListener('click', openSheet);
-  $('mobilePlaceAd')?.addEventListener('click', openSheet);
-  $('closeSheet')?.addEventListener('click', closeSheet);
-  $('closePanel')?.addEventListener('click', ()=>$('panel').classList.add('hidden'));
-  document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));
-  $('imageInput')?.addEventListener('change', handleImage);
-  $('sizeSlider')?.addEventListener('input', applySliderSize);
-  $('deleteDraft')?.addEventListener('click', deleteDraft);
-  $('deployBtn')?.addEventListener('click', deployDraft);
-  window.addEventListener('storage',()=>{ state.wallet=localStorage.getItem('jakwo_wallet')||''; updateWalletUI(); });
-}
-async function connectWallet(){
-  try{
-    if(window.solana && window.solana.isPhantom){
-      const res = await window.solana.connect();
-      state.wallet = res.publicKey.toString();
-    }else{
-      const demo = confirm('Phantom not detected. Use demo wallet for UI testing?');
-      if(!demo) return;
-      state.wallet = 'DEMO-' + Math.random().toString(36).slice(2,8).toUpperCase();
+  const storyHTML = `
+    <h2>THE STORY OF JAKWO</h2>
+    <p>At first, Wojak was only a face — a tired shape the internet used when words were not enough.</p>
+    <p>He became every loss, every late night, every silent laugh, every failure people were too embarrassed to explain.</p>
+    <p>But beneath the meme was Jakwo: the one who still felt. The one who watched every brand, coin, creator, troll, and dream fight for attention in a world that never stopped scrolling.</p>
+    <p>Then the internet became a battlefield. Memes became weapons. Attention became territory. Every image became a flag planted into history.</p>
+    <p>JAKWO War Ads Arena was created for that war. Not a clean billboard. Not a boring ad slot. A permanent battlefield where anyone can place an image, attach a link, and fight for visibility.</p>
+    <p>Some ads will rise. Some will be buried. Some will be covered by bigger attacks. But every placed ad becomes part of the arena's history.</p>
+    <h2>BUY. PLACE. BLOCK. REPEAT.</h2>
+    <p>This is not just advertising. This is internet territory.</p>`;
+
+  const rulesHTML = `
+    <h2>📜 MEME WAR ADS ARENA – OFFICIAL RULES</h2>
+    <h3>1. Overview</h3>
+    <p>Meme War Ads Arena is a digital advertising battleground where users purchase image ad space using USDT/USDC. Once purchased, users upload their image with one external link and place it anywhere on the arena. Ads are permanent once placed and can be blocked or covered by future ads. There are no removals, no resizing after deployment, and no refunds.</p>
+    <h3>2. Payment and Pricing</h3>
+    <p>Users resize freely before deployment. Price depends on arena coverage. Minimum cost is 0.50. Full arena cost is 1,000,000.</p>
+    <h3>3. Placement Rules</h3>
+    <ul><li>Users may place their ad anywhere on the arena.</li><li>Once deployed, the ad cannot be moved, removed, resized, or edited.</li><li>Ads can be placed on top of or covering other ads.</li><li>The most recently placed ad on that area remains visible.</li></ul>
+    <h3>4. Blocking and War Rules</h3>
+    <p>Users can block or cover other ads by placing a new ad on top. No refunds if your ad gets covered. Users can fight back by buying and placing more ads. This is not a billboard. It is a battlefield.</p>
+    <h3>5. Permanency</h3>
+    <ul><li>Move after placement: ❌ No</li><li>Resize after placement: ❌ No</li><li>Edit image/link: ❌ No</li><li>Remove/delete: ❌ No</li><li>Refund: ❌ No</li><li>Purchase another ad: ✔ Yes</li><li>Cover/block other ads: ✔ Yes</li></ul>
+    <h3>6. External Links and Click Risk</h3>
+    <p>Each ad can include one clickable external link. Meme War Ads Arena does not verify or guarantee the safety of external links. Clicking any link is at your own risk.</p>
+    <h3>7. Content Restrictions</h3>
+    <p>Strictly prohibited: hate, racism, violence, extremist content, pornographic/sexually explicit material, malware, phishing, wallet drainers, illegal links, fake impersonation, and false financial claims. Violating ads may be removed without refund.</p>
+    <h3>8. Liability Disclaimer</h3>
+    <p>Meme War Ads Arena is a public user-generated advertising platform. Advertisers are fully responsible for their uploaded content. Users click on ads at their own risk. Meme War Ads Arena is not liable for financial loss, scam, or damage caused by user-posted content or links.</p>
+    <h3>9. Reporting Ads</h3><p>Users may report unsafe or illegal ads. Confirmed violations may be removed without refund.</p>
+    <h3>10. Final Rule</h3><p><b>Buy. Place. Block. Repeat.</b> Once your ad enters the arena, it lives there forever — visible or buried, but never removed.</p>`;
+
+  function shortWallet(w){ return w ? w.slice(0,4) + '...' + w.slice(-4) : 'CONNECT'; }
+  function updateWallet(){ $('#connectBtn').textContent = shortWallet(wallet); }
+  function saveStats(){ localStorage.setItem('jakwo_stats', JSON.stringify(stats)); }
+  function renderStats(){
+    $('#totalAds').textContent = stats.total;
+    $('#arenaVolume').textContent = Number(stats.volume).toFixed(2);
+    $('#latestWar').textContent = stats.latest || 'None';
+    $('#topWarlord').textContent = stats.top || 'None';
+  }
+  function priceFor(el){
+    if(!el) return 0.5;
+    const arenaArea = arena.clientWidth * arena.scrollHeight;
+    const adArea = el.offsetWidth * el.offsetHeight;
+    const coverage = Math.min(100, Math.max(.01, (adArea / arenaArea) * 100));
+    const price = Math.max(.5, Math.min(1000000, 0.5 + Math.pow(coverage/100, 2.4) * 999999.5));
+    return {coverage, price};
+  }
+  function updatePrice(){
+    const p = currentAd ? priceFor(currentAd) : {coverage:.1, price:.5};
+    $('#costText').textContent = `${p.price.toFixed(2)} USDC`;
+    $('#coverageText').textContent = `${p.coverage.toFixed(2)}%`;
+    $('#sheetPrice').textContent = `${p.price.toFixed(2)} USDC`;
+  }
+  function openSheet(){ sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); }
+  function closeSheet(){ sheet.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); }
+  function openPanel(type){
+    const map = {
+      rules: rulesHTML,
+      story: storyHTML,
+      leaderboard: `<h2>🏆 TOP WARLORDS</h2><p>No confirmed paid warlords yet.</p><p>Leaderboard will rank advertisers by real paid volume.</p>`,
+      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><input placeholder="Connect wallet to chat" style="width:100%;height:44px;padding:10px">`
+    };
+    panelContent.innerHTML = map[type] || '';
+    panel.classList.remove('hidden');
+  }
+  function closePanel(){ panel.classList.add('hidden'); }
+  function impact(){
+    document.body.classList.add('shake'); $('#impactFlash').classList.add('flash');
+    setTimeout(()=>{document.body.classList.remove('shake'); $('#impactFlash').classList.remove('flash')}, 600);
+  }
+  function announce(name, price){
+    $('#tickerText').textContent = `🚨 ${name} launched a new war ad for ${price.toFixed(2)} USDC • Buy. Place. Block. Repeat. • New ads can cover old ads •`;
+  }
+  function addAd(src){
+    $('#emptyCard')?.remove();
+    const ad = document.createElement('div');
+    ad.className = 'ad editing';
+    ad.style.left = '14%'; ad.style.top = '18%'; ad.style.width = '120px'; ad.style.height = '90px';
+    ad.innerHTML = `<button class="x" title="Remove">×</button><img src="${src}" alt="war ad"><span class="resize"></span>`;
+    arena.appendChild(ad);
+    currentAd = ad; makeInteractive(ad); updatePrice();
+  }
+  function makeInteractive(el){
+    let dragging=false, resizing=false, sx=0, sy=0, sl=0, st=0, sw=0, sh=0;
+    const down = (e) => {
+      if(el.classList.contains('locked')) return;
+      const t = e.target;
+      if(t.classList.contains('x')){ el.remove(); currentAd=null; updatePrice(); return; }
+      const p = e.touches ? e.touches[0] : e;
+      sx=p.clientX; sy=p.clientY; sl=parseFloat(el.style.left)||0; st=parseFloat(el.style.top)||0; sw=el.offsetWidth; sh=el.offsetHeight;
+      resizing = t.classList.contains('resize'); dragging = !resizing; el.setPointerCapture?.(e.pointerId||0);
+    };
+    const move = (e) => {
+      if(el.classList.contains('locked')) return;
+      if(!dragging && !resizing) return;
+      const p = e.touches ? e.touches[0] : e; const dx=p.clientX-sx, dy=p.clientY-sy;
+      if(resizing){ el.style.width = Math.max(40, sw+dx)+'px'; el.style.height = Math.max(40, sh+dy)+'px'; }
+      if(dragging){ el.style.left = Math.max(0, sl+dx)+'px'; el.style.top = Math.max(0, st+dy+arena.scrollTop)+'px'; }
+      updatePrice(); e.preventDefault();
+    };
+    const up = ()=>{dragging=false; resizing=false};
+    el.addEventListener('pointerdown', down); window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }
+  async function connect(){
+    try{
+      if(window.solana?.isPhantom){ const r = await window.solana.connect(); wallet = r.publicKey.toString(); }
+      else { wallet = 'DEMO' + Math.random().toString(36).slice(2,8).toUpperCase(); alert('Phantom not found. Demo wallet connected for testing.'); }
+      localStorage.setItem('jakwo_wallet', wallet); updateWallet();
+    }catch(e){ alert('Wallet connect cancelled.'); }
+  }
+  function deploy(){
+    if(!currentAd){ alert('Upload and place a photo first.'); return; }
+    if(!wallet){ alert('Connect wallet first.'); return; }
+    const voucher = $('#voucherCode').value.trim().toUpperCase();
+    const name = ($('#adName').value || 'Unnamed War Ad').trim().slice(0,40);
+    const p = priceFor(currentAd);
+
+    if(!voucher){
+      alert('Payment required. This static test will NOT publish free. Use voucher TEST to demo lock, or wire Phantom USDC payment before public launch.');
+      return;
     }
-    localStorage.setItem('jakwo_wallet', state.wallet);
-    updateWalletUI();
-  }catch(e){ alert('Wallet connect cancelled.'); }
-}
-function shortWallet(w){return w ? w.slice(0,4)+'...'+w.slice(-4) : 'Connect Phantom'}
-function updateWalletUI(){ const b=$('connectWallet'); if(b) b.textContent = shortWallet(state.wallet); }
-
-function openPanel(type){
-  const html = {
-    rules: rulesHTML(),
-    chat: chatHTML(),
-    story: storyHTML(),
-    lords: lordsHTML()
-  }[type] || '';
-  panelContent.innerHTML = html;
-  $('panel').classList.remove('hidden');
-  if(type==='chat') bindChat();
-}
-function rulesHTML(){return `<div class="rules-text"><h2>📜 MEME WAR ADS ARENA – OFFICIAL RULES</h2>
-<h3>1. Overview</h3><p>Meme War Ads Arena is a digital advertising battleground where users upload one image ad with one external link and place it anywhere on the arena. Before final deployment, users may move, resize, replace, or delete the draft. Once deployed after payment or a valid voucher, the ad becomes permanent and locked. It cannot be moved, resized, edited, deleted, or refunded. Future ads can cover it.</p>
-<h3>2. Payment and Pricing</h3><p>Minimum placement starts at <b>0.50 USDC</b>. Full arena domination costs <b>1,000,000 USDC</b>. Price is calculated from the ad's size / arena coverage while the user resizes it. Users may buy multiple ads.</p>
-<h3>3. Placement Rules</h3><p>✔ Users may place their ad anywhere on the arena. ✔ Before deployment, users may freely move and resize their draft. ✔ After deployment, the ad cannot be moved, removed, resized, or edited. ✔ Ads can be placed on top of or covering other ads. ✔ The newest ad on that area remains visible.</p><blockquote>Whoever places last on that spot is visible. Older ads remain underneath but are not removed.</blockquote>
-<h3>4. Blocking and War Rules</h3><p>Users can block or cover other ads by placing a new ad on top. Ads cannot be reactivated or reclaimed unless a new ad is purchased and placed again. No refunds if your ad gets covered. Users can fight back by buying and placing more ads.</p><blockquote>This is not a billboard. It’s a battlefield.</blockquote>
-<h3>5. Permanency</h3><p><b>Move after deployment:</b> ❌ No<br><b>Resize after deployment:</b> ❌ No<br><b>Edit image/link:</b> ❌ No<br><b>Remove/delete:</b> ❌ No<br><b>Refund:</b> ❌ No<br><b>Purchase another ad:</b> ✔ Yes<br><b>Cover/block other ads:</b> ✔ Yes</p><blockquote>Once an ad is placed, it becomes part of permanent arena history.</blockquote>
-<h3>6. External Links and Click Risk</h3><p>Each ad can include one clickable external link such as a website, Telegram, X/Twitter, YouTube, product page, token, or project page. Meme War Ads Arena does not verify or guarantee the safety of external links. Clicking any link is at your own risk.</p>
-<h3>7. Content Restrictions</h3><p>🚫 Hate, racism, violence, extremist content<br>🚫 Pornographic or sexually explicit material<br>🚫 Malware, phishing, wallet drainers, illegal links<br>🚫 Fake impersonation of people, brands, or companies<br>🚫 False financial claims or “guaranteed profit” ads</p><p>If an ad violates these rules, it may be removed without refund.</p>
-<h3>8. Liability Disclaimer</h3><p>Meme War Ads Arena is a public user-generated advertising platform. All ads, images, and external links are uploaded and managed by users. We do not verify, approve, or validate the accuracy, safety, or legitimacy of any advertisement. Advertisers are fully responsible for their uploaded content. Users click on ads at their own risk. Meme War Ads Arena is not liable for any financial loss, scam, or damage caused by user-posted content or links.</p>
-<h3>9. Reporting Ads</h3><p>Users may report illegal content, unsafe links, hate, scams, or explicit material. Reported ads may be reviewed and removed if confirmed to violate content policies. Refunds will not be given for removed ads.</p>
-<h3>10. Final Rule</h3><blockquote>Buy. Place. Block. Repeat. Once your ad enters the arena, it lives there forever — visible or buried, but never removed.</blockquote></div>`}
-function storyHTML(){return `<h2>📖 The Story of Wojak & JAKWO</h2><p>Wojak became the face of the internet: pain, hope, late-night scrolling, red candles, and silent dreams.</p><p>Jakwo is the hidden self behind that face — the one that refused to disappear inside the feed.</p><p>So the arena was built: a permanent battlefield where memes, ads, logos, and messages fight for attention.</p><p><b>Memes became weapons. Attention became territory. Ads became war.</b></p><p><a class="btn" href="story.html">Open full story</a></p>`}
-function lordsHTML(){const ads=getAds(); const by={}; ads.forEach(a=>{by[a.wallet||'unknown']=(by[a.wallet||'unknown']||0)+Number(a.amount||0)}); const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([w,a],i)=>`<p><b>#${i+1}</b> ${shortWallet(w)} — ${a.toFixed(2)} USDC</p>`).join('')||'<p>No warlords yet.</p>';return `<h2>🏆 Top Warlords</h2>${rows}`}
-function chatHTML(){return `<h2>💬 War Chat</h2><div id="chatMessages" class="rules-text"><p>Connect wallet to send messages.</p></div><input id="chatInput" class="input" placeholder="Troll message, no links"><button id="sendChat" class="btn primary" style="margin-top:10px">Send</button>`}
-function bindChat(){ $('sendChat').addEventListener('click',()=>{ if(!state.wallet) return alert('Connect wallet first.'); const msg=$('chatInput').value.trim(); if(!msg) return; if(/https?:\/\//i.test(msg)) return alert('No links in chat.'); const box=$('chatMessages'); box.innerHTML += `<p><b>${shortWallet(state.wallet)}:</b> ${escapeHTML(msg)}</p>`; $('chatInput').value=''; });}
-
-function openSheet(){ $('adSheet').classList.remove('hidden'); }
-function closeSheet(){ $('adSheet').classList.add('hidden'); }
-function handleImage(e){ const file=e.target.files[0]; if(!file) return; const url=URL.createObjectURL(file); createDraft(url); }
-function createDraft(url){ deleteDraft(); const arena=$('draftLayer'); const el=document.createElement('div'); el.className='draft-ad'; el.style.left='120px'; el.style.top='120px'; el.style.width='120px'; el.style.height='120px'; el.innerHTML=`<img src="${url}"><button class="draft-delete">×</button><div class="resize-handle"></div>`; arena.appendChild(el); state.draft={el,url,w:120,h:120,x:120,y:120}; bindDraft(el); updatePrice(); closeSheet(); }
-function bindDraft(el){
-  el.querySelector('.draft-delete').addEventListener('click', deleteDraft);
-  el.addEventListener('pointerdown', e=>{ if(e.target.classList.contains('resize-handle')||e.target.classList.contains('draft-delete')) return; state.dragging=el; const r=el.getBoundingClientRect(); state.offsetX=e.clientX-r.left; state.offsetY=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
-  el.querySelector('.resize-handle').addEventListener('pointerdown', e=>{ state.resizing=el; el.setPointerCapture(e.pointerId); e.stopPropagation(); });
-  el.addEventListener('pointermove', e=>{ if(state.dragging===el){ const parent=$('arenaViewport').getBoundingClientRect(); const x=e.clientX-parent.left+$('arenaViewport').scrollLeft-state.offsetX; const y=e.clientY-parent.top+$('arenaViewport').scrollTop-state.offsetY; setDraftPos(x,y); } if(state.resizing===el){ const r=el.getBoundingClientRect(); const nw=Math.max(40,e.clientX-r.left); const nh=Math.max(40,e.clientY-r.top); setDraftSize(nw,nh); } });
-  el.addEventListener('pointerup', e=>{state.dragging=null;state.resizing=null;});
-}
-function setDraftPos(x,y){ if(!state.draft)return; state.draft.x=Math.max(0,x); state.draft.y=Math.max(0,y); state.draft.el.style.left=state.draft.x+'px'; state.draft.el.style.top=state.draft.y+'px'; }
-function setDraftSize(w,h){ if(!state.draft)return; state.draft.w=w; state.draft.h=h; state.draft.el.style.width=w+'px'; state.draft.el.style.height=h+'px'; $('sizeSlider').value=Math.min(100,Math.max(1,Math.round((w*h)/(1200*900)*100))); updatePrice(); }
-function applySliderSize(){ if(!state.draft)return; const pct=Number($('sizeSlider').value)/100; const area=1200*900*pct; const side=Math.sqrt(area); setDraftSize(side,side); }
-function calcPrice(){ if(!state.draft)return cfg.MIN_PRICE||.5; const cov=Math.min(1,(state.draft.w*state.draft.h)/(1200*900)); const min=cfg.MIN_PRICE||.5,max=cfg.MAX_PRICE||1000000; return min + Math.pow(cov,2.15)*(max-min); }
-function updatePrice(){ const price=calcPrice(); const cov=state.draft?((state.draft.w*state.draft.h)/(1200*900)*100):0; $('liveCost').textContent=price.toLocaleString(undefined,{maximumFractionDigits:2})+' USDC'; $('sheetPrice').textContent=price.toLocaleString(undefined,{maximumFractionDigits:2})+' USDC'; $('coverageText').textContent=cov.toFixed(2)+'%'; }
-function cleanAdName(){
-  const n = ($('adName')?.value || '').trim();
-  return n ? n.slice(0,40) : 'Unnamed War Ad';
-}
-function announceWar(ad){
-  const name = escapeHTML(ad.name || 'Unnamed War Ad');
-  const amount = Number(ad.amount || 0).toLocaleString(undefined,{maximumFractionDigits:2});
-  const msg = `🚨 ${name} launched a new war ad • ${amount} USDC • Buy. Place. Block. Repeat. • `;
-  const t = $('tickerTrack');
-  if(t) t.textContent = msg + t.textContent;
-}
-
-function deleteDraft(){ if(state.draft?.el) state.draft.el.remove(); state.draft=null; updatePrice(); }
-function deployDraft(){
-  if(!state.draft) return alert('Choose a photo first.');
-  if(!state.wallet) return alert('Connect Phantom first.');
-  const voucher=$('voucherCode').value.trim();
-  const price=calcPrice();
-  const name=cleanAdName();
-  if(!voucher){
-    alert(`Payment required: ${price.toFixed(2)} USDC. This static test build will NOT deploy paid ads without real Phantom/Solana payment verification.`);
-    return;
+    if(!['TEST','PROMO','FIRST100'].includes(voucher) && !voucher.startsWith('JAKWO-')){
+      alert('Invalid voucher code.'); return;
+    }
+    currentAd.classList.remove('editing'); currentAd.classList.add('locked');
+    currentAd.dataset.name = name; currentAd.dataset.link = $('#adLink').value.trim();
+    currentAd.addEventListener('click',()=>{ if(currentAd.dataset.link) window.open(currentAd.dataset.link,'_blank'); });
+    stats.total += 1; stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name,p.price); impact(); closeSheet(); currentAd=null; updatePrice();
+    alert('Ad deployed and locked for test. Real paid launch must replace voucher demo with verified USDC payment.');
   }
-  const ok = confirm('Use voucher and deploy this ad? In production, code is checked and burned.');
-  if(!ok) return;
-  const ad={id:Date.now(),name,image:state.draft.url,link:$('adLink').value.trim(),wallet:state.wallet,amount:0,x:state.draft.x,y:state.draft.y,w:state.draft.w,h:state.draft.h,created_at:new Date().toISOString(),voucher_code:voucher};
-  const ads=getAds(); ads.push(ad); localStorage.setItem('jakwo_ads',JSON.stringify(ads));
-  addAdToDom(ad); announceWar(ad); deleteDraft(); closeSheet(); updateStats(); warImpact(price); alert('Voucher ad locked. Production must verify and burn voucher in Supabase.');
-}
-function getAds(){ try{return JSON.parse(localStorage.getItem('jakwo_ads')||'[]')}catch{return[]} }
-function loadLocalAds(){ getAds().forEach(addAdToDom); updateStats(); }
-function addAdToDom(ad){ const el=document.createElement('a'); el.className='war-ad locked'; el.href=ad.link||'#'; el.target='_blank'; el.style.left=ad.x+'px'; el.style.top=ad.y+'px'; el.style.width=ad.w+'px'; el.style.height=ad.h+'px'; el.style.zIndex=100+Number(ad.id||0)%100000; el.title=`${ad.name||'War Ad'} • ${Number(ad.amount||0).toFixed(2)} USDC`; el.innerHTML=`<img src="${ad.image}">`; $('adLayer').appendChild(el); $('emptyCallout').style.display='none'; }
-function updateStats(){ const ads=getAds(); $('totalAds').textContent=ads.length; const vol=ads.reduce((s,a)=>s+Number(a.amount||0),0); $('usdcVolume').textContent=vol.toLocaleString(undefined,{maximumFractionDigits:2}); $('latestWar').textContent=ads.length?(ads[ads.length-1].name||'War Ad'):'None'; const top={}; ads.forEach(a=>top[a.wallet]=(top[a.wallet]||0)+Number(a.amount||0)); const tw=Object.entries(top).sort((a,b)=>b[1]-a[1])[0]; $('topWarlord').textContent=tw?shortWallet(tw[0]):'None'; if(ads.length)$('emptyCallout').style.display='none'; }
-function warImpact(price){ document.body.classList.add('impact'); if(navigator.vibrate) navigator.vibrate(price>100000?[250,80,250,80,250]:[80]); setTimeout(()=>document.body.classList.remove('impact'),900); if(price>=1000000) alert('🚨 TSUNAMI ALERT: ARENA DOMINATOR DETECTED. Lockdown mode should trigger in production.'); }
-function escapeHTML(s){return s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-init();
 
-// === HOTFIX: reliable buttons/links and mobile controls ===
-(function(){
-  function byId(id){ return document.getElementById(id); }
-  function openAnyPanel(type){
-    if (typeof openPanel === 'function') openPanel(type);
-  }
-  window.addEventListener('DOMContentLoaded', function(){
-    const tw = byId('twitterLink');
-    const tg = byId('telegramLink');
-    if (tw) { tw.href = (window.JAKWO_CONFIG && window.JAKWO_CONFIG.TWITTER) || 'https://x.com/jakw0o'; tw.textContent = 'X'; tw.target='_blank'; }
-    if (tg) { tg.href = (window.JAKWO_CONFIG && window.JAKWO_CONFIG.TELEGRAM) || 'https://t.me/+hJ-0IQGfYTRmYjM0'; tg.textContent = 'TG'; tg.target='_blank'; }
+  $('#connectBtn').onclick = connect;
+  $('#addBtn').onclick = openSheet; $('#mobileAddBtn').onclick = openSheet; $('#closeSheet').onclick = closeSheet;
+  $('#closePanel').onclick = closePanel;
+  $('#deployBtn').onclick = deploy;
+  $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };
+  $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
+  $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));
 
-    // Direct click binding for all panel buttons, including mobile bottom nav.
-    document.querySelectorAll('[data-panel]').forEach(function(btn){
-      btn.onclick = function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        openAnyPanel(btn.getAttribute('data-panel'));
-      };
-    });
-
-    const placeDesktop = byId('placeAdBtn');
-    const placeMobile = byId('mobilePlaceAd');
-    if (placeDesktop) placeDesktop.onclick = function(e){ e.preventDefault(); e.stopPropagation(); if (typeof openSheet === 'function') openSheet(); };
-    if (placeMobile) placeMobile.onclick = function(e){ e.preventDefault(); e.stopPropagation(); if (typeof openSheet === 'function') openSheet(); };
-
-  });
+  updateWallet(); renderStats(); updatePrice();
 })();
