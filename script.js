@@ -67,15 +67,26 @@
     const price = Math.max(.5, Math.min(1000000, 0.5 + Math.pow(coverage/100, 2.4) * 999999.5));
     return {coverage, price};
   }
+  function activeVoucherValue(){
+    const input = $('#voucherCode');
+    return input ? voucherValue(input.value) : 0;
+  }
   function updatePrice(){
     const p = currentAd ? priceFor(currentAd) : {coverage:.1, price:.5};
-    $('#costText').textContent = `${p.price.toFixed(2)} USDC`;
+    const vv = currentAd ? activeVoucherValue() : 0;
+    const displayPrice = vv || p.price;
+    $('#costText').textContent = `${displayPrice.toFixed(2)} USDC`;
     $('#coverageText').textContent = `${p.coverage.toFixed(2)}%`;
-    $('#sheetPrice').textContent = `${p.price.toFixed(2)} USDC`;
+    $('#sheetPrice').textContent = `${displayPrice.toFixed(2)} USDC`;
   }
-  function openSheet(){ closePanel(); sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); }
+  function openSheet(){
+    if(sheet.classList.contains('open')){ closeSheet(); return; }
+    closePanel();
+    sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false');
+  }
   function closeSheet(){ sheet.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); }
   function openPanel(type){
+    if(!panel.classList.contains('hidden') && panel.dataset.type === type){ closePanel(); return; }
     closeSheet();
     const map = {
       rules: rulesHTML,
@@ -183,7 +194,7 @@
     const c = (code || '').toUpperCase().replace(/,/g,'');
     if(!c) return 0;
     if(c === 'TEST') return 0.5;
-    const m = c.match(/(1000000|1000|500|100|0\.5|050|50|5)/);
+    const m = c.match(/(?:^|[-_\s])(1000000|1000|500|100|0\.5|050|50|5)(?:$|[-_\s])/);
     if(!m) return 0;
     if(m[1] === '050') return 0.5;
     return Number(m[1]);
@@ -195,9 +206,10 @@
     let coverage = Math.pow((clamped - 0.5) / 999999.5, 1 / 2.4) * 100;
     if(clamped <= 0.5) coverage = 0.1;
     const area = Math.max(1600, arenaArea * coverage / 100);
-    const side = Math.max(40, Math.sqrt(area));
-    currentAd.style.width = Math.round(side) + 'px';
-    currentAd.style.height = Math.round(side * 0.75) + 'px';
+    const width = Math.max(40, Math.sqrt(area * 4 / 3));
+    const height = Math.max(40, width * 0.75);
+    currentAd.style.width = Math.round(width) + 'px';
+    currentAd.style.height = Math.round(height) + 'px';
     updatePrice();
   }
 
@@ -206,7 +218,7 @@
     if(!wallet){ alert('Connect wallet first.'); return; }
     const voucher = $('#voucherCode').value.trim().toUpperCase();
     const name = ($('#adName').value || 'Unnamed War Ad').trim().slice(0,40);
-    const p = priceFor(currentAd);
+    let p = priceFor(currentAd);
 
     if(!voucher){
       alert('Payment required. This static test will NOT publish free. Use voucher TEST to demo lock, or wire Phantom USDC payment before public launch.');
@@ -216,7 +228,11 @@
       alert('Invalid voucher code.'); return;
     }
     const vv = voucherValue(voucher);
-    if(vv) resizeAdToPrice(vv);
+    if(vv){
+      resizeAdToPrice(vv);
+      p = priceFor(currentAd);
+      p.price = vv;
+    }
     const deployedAd = currentAd;
     let adLink = ($('#adLink').value || '').trim();
     if(adLink && !/^https?:\/\//i.test(adLink)) adLink = 'https://' + adLink;
