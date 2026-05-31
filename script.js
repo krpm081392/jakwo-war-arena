@@ -1,102 +1,121 @@
-const CFG = window.JAKWO_CONFIG || {};
-const MEMES = Array.from({length:16},(_,i)=>`assets/memes/${10944+i}.jpg`);
-const MEME_DATA = [
-  ['COPE HARDER',10947,565,72,-5], ['DEGEN BRAIN',10953,805,66,3], ['MARKET PAIN',10947,1045,84,-3], ['WAGMI?',10952,1300,80,4], ['RUG SEASON',10951,1520,76,6],
-  ['OLD WAR',10956,560,310,-4], ['EXIT LIQUIDITY',10955,780,315,5], ['WE ARE EARLY',10946,985,335,-5], ['NO RISK NO LAMBO',10949,1195,335,2], ['LIFE NOT FOUND',10945,1385,330,5], ['SLEEP IS FUD',10953,1570,330,4],
-  ['MC DONALD ARC',10948,495,640,-5], ['SLEEP IS FUD',10953,700,620,5], ['NO RISK NO LAMBO',10949,925,655,4], ['PEPE SEES YOU',10956,1175,650,-3], ['STILL HERE',10958,1395,665,4]
-];
-const TIERS = [
-  {value:1000,max:50,label:'Influencer',color:'#c448ff'},
-  {value:500,max:50,label:'Alpha',color:'#ffa500'},
-  {value:100,max:100,label:'Community',color:'#ffbd3a'},
-  {value:0.5,max:200,label:'Mini Warrior',color:'#42dd7a'}
-];
-let walletAddress = localStorage.getItem('jakwo_wallet') || '';
-let appliedVoucher = null;
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-function toast(t){let el=$('.toast'); if(!el){el=document.createElement('div');el.className='toast';document.body.appendChild(el)} el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2800)}
-function short(w){return w?`${w.slice(0,4)}...${w.slice(-4)}`:''}
-function escapeHtml(s=''){return String(s).replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m]))}
-async function connectWallet(){try{if(!window.solana || !window.solana.isPhantom){toast('Phantom not detected');return null} const res=await window.solana.connect(); walletAddress=res.publicKey.toString(); localStorage.setItem('jakwo_wallet',walletAddress); updateWalletButtons(); toast('Connected '+short(walletAddress)); return walletAddress}catch(e){toast('Wallet connect cancelled'); return null}}
-function updateWalletButtons(){const text=walletAddress?short(walletAddress):'CONNECT'; $$('.connect-btn').forEach(b=>{b.textContent=text; b.classList.toggle('connected',!!walletAddress)}); $$('.need-wallet').forEach(i=>i.placeholder=walletAddress?'Say something...':'Connect wallet to chat')}
-function openPanel(id){document.getElementById(id)?.classList.add('open')}
-function closePanel(id){document.getElementById(id)?.classList.remove('open')}
-function headers(){return {apikey:CFG.SUPABASE_ANON_KEY, Authorization:`Bearer ${CFG.SUPABASE_ANON_KEY}`, 'Content-Type':'application/json'}}
-async function supaSelect(table,qs='select=*'){if(!CFG.SUPABASE_URL||!CFG.SUPABASE_ANON_KEY)return []; try{const r=await fetch(`${CFG.SUPABASE_URL}/rest/v1/${table}?${qs}`,{headers:headers()}); if(!r.ok) throw new Error(await r.text()); return await r.json()}catch(e){console.warn('Supabase select fallback',table,e); return []}}
-async function supaInsert(table,obj){if(!CFG.SUPABASE_URL||!CFG.SUPABASE_ANON_KEY)return null; try{const r=await fetch(`${CFG.SUPABASE_URL}/rest/v1/${table}`,{method:'POST',headers:{...headers(),Prefer:'return=representation'},body:JSON.stringify(obj)}); if(!r.ok) throw new Error(await r.text()); const j=await r.json(); return j[0]}catch(e){console.warn('Supabase insert fallback',table,e); return null}}
-async function supaPatch(table,filter,obj){if(!CFG.SUPABASE_URL||!CFG.SUPABASE_ANON_KEY)return null; try{const r=await fetch(`${CFG.SUPABASE_URL}/rest/v1/${table}?${filter}`,{method:'PATCH',headers:{...headers(),Prefer:'return=representation'},body:JSON.stringify(obj)}); if(!r.ok) throw new Error(await r.text()); const j=await r.json(); return j[0]}catch(e){console.warn('Supabase patch fallback',table,e); return null}}
-function calcPrice(w,h){
-  // Pricing rule: smallest mini ad is 0.50 USDC, full arena is exactly 1,000,000 USDC.
-  const arenaW=1800, arenaH=1200, arena=arenaW*arenaH;
-  const minArea=80*80, min=.5, full=1000000;
-  const area=Math.max(1, Math.min(arena, Number(w||80)*Number(h||80)));
-  if(area<=minArea) return min;
-  const t=(area-minArea)/(arena-minArea);
-  return Math.min(full, Math.max(min, Math.round((min+(full-min)*t)*100)/100));
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const cfg = window.JAKWO_CONFIG || {};
+const state = { wallet: localStorage.getItem('jakwo_wallet') || '', image: '', coverage: 1, deployed: false };
+
+function shortWallet(w){ return w ? w.slice(0,4)+'...'+w.slice(-4) : ''; }
+function syncWallet(){
+  const btn = $('#connectBtn'); if(!btn) return;
+  if(state.wallet){ btn.textContent = shortWallet(state.wallet); btn.classList.add('connected'); }
+  else { btn.textContent = 'CONNECT WALLET'; btn.classList.remove('connected'); }
 }
-function adName(a){return a.ad_name||a.name||'Untitled War'}
-function adLink(a){return a.link||a.link_url||''}
-function adW(a){return Number(a.width||a.w||80)}
-function adH(a){return Number(a.height||a.h||80)}
-async function loadStats(){let ads=await supaSelect('war_ads','select=*&order=created_at.desc&limit=800'); if(!ads.length){ads=JSON.parse(localStorage.getItem('jakwo_local_ads')||'[]').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))}
-  const total=ads.length; const paid=ads.filter(a=>(a.payment_type||'paid')!=='promo'); const sum=paid.reduce((n,a)=>n+(Number(a.price)||0),0); const latest=ads[0]?adName(ads[0]):'NONE'; const top=paid.reduce((m,a)=>(Number(a.price)||0)>(Number(m.price)||0)?a:m,{price:0,ad_name:'NONE YET'});
-  $$('.total-ads').forEach(e=>e.textContent=total); $$('.usdc-arena').forEach(e=>e.textContent=sum.toFixed(2)); $$('.latest-war').forEach(e=>e.textContent=latest); $$('.top-lord').forEach(e=>e.textContent=adName(top)==='Untitled War'?'NONE YET':adName(top)); renderWarlords(paid);
+async function connectWallet(){
+  try{
+    if(window.solana && window.solana.isPhantom){
+      const res = await window.solana.connect();
+      state.wallet = res.publicKey.toString();
+    } else {
+      state.wallet = 'DEMO'+Math.random().toString(36).slice(2,10).toUpperCase();
+      alert('Phantom not detected. Demo wallet connected for testing.');
+    }
+    localStorage.setItem('jakwo_wallet', state.wallet); syncWallet();
+  }catch(e){ alert('Wallet connection cancelled.'); }
 }
-function renderWarlords(paid=[]){const list=$('#warlordList'); if(!list)return; const sorted=[...paid].sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0)).slice(0,3); list.innerHTML=''; for(let i=0;i<3;i++){const a=sorted[i]; const p=document.createElement('p'); p.innerHTML=`<b>#${i+1}</b><span>${a?escapeHtml(adName(a)):'OPEN'}</span><em>${a?(Number(a.price)||0).toFixed(2):'0'} USDC</em>`; list.appendChild(p)}}
-function initLinks(){const x=$('#xLink'), tg=$('#tgLink'); if(x)x.href=CFG.TWITTER||'#'; if(tg)tg.href=CFG.TELEGRAM||'#'}
-function initHome(){const layer=$('#memeLayer'); if(!layer)return; layer.innerHTML='';
-  const mobile = window.innerWidth <= 520;
-  const tablet = window.innerWidth <= 900 && !mobile;
-  const mobilePos = [
-    ['COPE HARDER',10947,260,88,-6], ['DEGEN BRAIN',10953,380,72,5], ['MARKET PAIN',10947,285,245,-4], ['WAGMI?',10952,410,235,7],
-    ['RUG SEASON',10951,250,405,5], ['OLD WAR',10956,385,410,-5], ['EXIT LIQUIDITY',10955,270,570,4], ['WE ARE EARLY',10946,410,585,-6],
-    ['NO RISK NO LAMBO',10949,245,745,-4], ['LIFE NOT FOUND',10945,395,755,5], ['SLEEP IS FUD',10953,300,905,4], ['MC DONALD ARC',10948,415,930,-5],
-    ['PEPE SEES YOU',10956,245,1070,-4], ['STILL HERE',10958,390,1095,5], ['BLOOD RED',10950,285,1225,-3], ['BULLS NEVER SLEEP',10944,410,1230,6]
-  ];
-  const tabletPos = [
-    ['COPE HARDER',10947,390,90,-5], ['DEGEN BRAIN',10953,585,72,3], ['MARKET PAIN',10947,780,90,-3], ['WAGMI?',10952,980,90,4], ['RUG SEASON',10951,1180,90,6],
-    ['OLD WAR',10956,390,310,-4], ['EXIT LIQUIDITY',10955,590,315,5], ['WE ARE EARLY',10946,790,335,-5], ['NO RISK NO LAMBO',10949,990,335,2], ['LIFE NOT FOUND',10945,1190,330,5],
-    ['MC DONALD ARC',10948,390,590,-5], ['SLEEP IS FUD',10953,590,620,5], ['PEPE SEES YOU',10956,790,650,-3], ['STILL HERE',10958,990,665,4], ['BLOOD RED',10950,1180,665,-2]
-  ];
-  const data = mobile ? mobilePos : tablet ? tabletPos : MEME_DATA;
-  data.forEach(([label,id,x,y,r],i)=>{const c=document.createElement('div'); c.className='meme-card '+(i%6===0?'old':''); c.style.left=x+'px'; c.style.top=y+'px'; c.style.setProperty('--r',r+'deg'); c.innerHTML=`<img src="assets/memes/${id}.jpg" draggable="false" alt="${escapeHtml(label)}"><b>${escapeHtml(label)}</b>`; layer.appendChild(c); makeDraggable(c); c.addEventListener('click',e=>{if(c.classList.contains('dragging'))return; c.classList.remove('spin','flip'); void c.offsetWidth; c.classList.add(Math.random()>.5?'spin':'flip')}); c.addEventListener('dblclick',()=>showLightbox(`assets/memes/${id}.jpg`));});
-  checkImpact();
+function priceFromCoverage(c){
+  const minCover = 0.0385;
+  if(c >= 100) return 1000000;
+  const p = 0.5 * Math.pow(c/minCover, 1.55);
+  return Math.min(1000000, Math.max(0.5, p));
 }
-function makeDraggable(el){let sx=0,sy=0,ox=0,oy=0,down=false,moved=false; el.addEventListener('pointerdown',e=>{down=true;moved=false;el.setPointerCapture(e.pointerId);sx=e.clientX;sy=e.clientY;ox=parseFloat(el.style.left)||0;oy=parseFloat(el.style.top)||0;el.classList.add('dragging')}); el.addEventListener('pointermove',e=>{if(!down)return; const dx=e.clientX-sx, dy=e.clientY-sy; if(Math.abs(dx)+Math.abs(dy)>4)moved=true; el.style.left=(ox+dx)+'px'; el.style.top=(oy+dy)+'px'}); el.addEventListener('pointerup',()=>{down=false;setTimeout(()=>el.classList.remove('dragging'),40)})}
-function showLightbox(src){let lb=$('.lightbox'); if(!lb){lb=document.createElement('div'); lb.className='lightbox'; lb.innerHTML='<img alt="expanded"><button class="close" style="position:absolute;right:20px;top:20px">×</button>'; document.body.appendChild(lb); lb.addEventListener('click',e=>{if(e.target===lb||e.target.tagName==='BUTTON')lb.classList.remove('open')})} lb.querySelector('img').src=src; lb.classList.add('open')}
-async function loadAds(){const canvas=$('#arenaCanvas'); if(!canvas)return; let ads=await supaSelect('war_ads','select=*&order=created_at.asc&limit=1000'); if(!ads.length){ads=JSON.parse(localStorage.getItem('jakwo_local_ads')||'[]')}
-  ads.forEach(a=>placeAd(a,false)); loadStats();
+function fmt(n){ return n>=1000 ? n.toLocaleString(undefined,{maximumFractionDigits:0}) : n.toFixed(2); }
+function updatePrice(){
+  const p = priceFromCoverage(state.coverage);
+  $('#coverageText') && ($('#coverageText').textContent = state.coverage.toFixed(state.coverage<1?2:1)+'%');
+  $('#priceText') && ($('#priceText').textContent = fmt(p)+' USDC');
+  $('#liveCost') && ($('#liveCost').textContent = fmt(p)+' USDC');
 }
-function ageDays(t){return t?((Date.now()-new Date(t).getTime())/86400000):0}
-function placeAd(a,preview=true){const canvas=$('#arenaCanvas'); if(!canvas)return null; const d=document.createElement(adLink(a)&&!preview?'a':'div'); d.className=(preview?'preview-ad':'placed-ad')+(ageDays(a.created_at)>30?' old-ad':''); d.style.left=(Number(a.x)||250)+'px'; d.style.top=(Number(a.y)||250)+'px'; d.style.width=adW(a)+'px'; d.style.height=adH(a)+'px'; if(adLink(a)&&!preview){d.href=adLink(a);d.target='_blank';d.rel='noreferrer'} d.title=`${adName(a)} — ${Number(a.price||0).toFixed(2)} USDC`; d.innerHTML=`<img src="${a.image_url||a.dataUrl||MEMES[0]}" alt="${escapeHtml(adName(a))}">${preview?'<button class="remove-mini" type="button" title="Remove image">×</button><span class="resize-handle" title="Drag to resize"></span>':''}`; canvas.appendChild(d); if(preview){d.querySelector('.remove-mini')?.addEventListener('click',e=>{e.stopPropagation(); window.jakwoRemovePreview?.()}); makeArenaDrag(d); makeArenaResize(d)} return d}
-function makeArenaDrag(el){let sx=0,sy=0,ox=0,oy=0,down=false; el.addEventListener('pointerdown',e=>{if(e.target.classList.contains('resize-handle')||e.target.classList.contains('remove-mini'))return; down=true;el.setPointerCapture(e.pointerId);sx=e.clientX;sy=e.clientY;ox=parseFloat(el.style.left)||0;oy=parseFloat(el.style.top)||0;el.style.cursor='grabbing'}); el.addEventListener('pointermove',e=>{if(!down)return; el.style.left=(ox+e.clientX-sx)+'px'; el.style.top=(oy+e.clientY-sy)+'px'}); el.addEventListener('pointerup',()=>{down=false;el.style.cursor='grab'})}
-function makeArenaResize(el){const h=el.querySelector('.resize-handle'); if(!h)return; let sx=0,sy=0,ow=0,oh=0,down=false; h.addEventListener('pointerdown',e=>{e.stopPropagation(); down=true; h.setPointerCapture(e.pointerId); sx=e.clientX; sy=e.clientY; ow=el.offsetWidth; oh=el.offsetHeight; el.classList.add('resizing')}); h.addEventListener('pointermove',e=>{if(!down)return; const nw=Math.max(30,Math.min(1800,ow+(e.clientX-sx))); const nh=Math.max(30,Math.min(1200,oh+(e.clientY-sy))); el.style.width=nw+'px'; el.style.height=nh+'px'; const wi=$('#adW'), hi=$('#adH'); if(wi)wi.value=Math.round(nw); if(hi)hi.value=Math.round(nh); const p=calcPrice(nw,nh); $$('.price-num').forEach(x=>x.textContent=p.toFixed(2)); updatePayButton()}); h.addEventListener('pointerup',()=>{down=false;el.classList.remove('resizing')})}
-function initUpload(){const open=$('#openUpload'), close=$('#closeUpload'), panel=$('#uploadPanel'); open?.addEventListener('click',()=>panel.classList.add('open')); close?.addEventListener('click',()=>panel.classList.remove('open')); panel?.classList.add('open');
-  let selected='',preview=null; const file=$('#fileInput'), drop=$('#dropZone'), w=$('#adW'), h=$('#adH'); function updatePrice(){let ww=Math.max(30,Math.min(1800,Number(w?.value)||80)); let hh=Math.max(30,Math.min(1200,Number(h?.value)||80)); if(w)w.value=Math.round(ww); if(h)h.value=Math.round(hh); const p=calcPrice(ww,hh); $$('.price-num').forEach(e=>e.textContent=p.toFixed(2)); if(preview){preview.style.width=ww+'px';preview.style.height=hh+'px'} updatePayButton()} w?.addEventListener('input',updatePrice); h?.addEventListener('input',updatePrice); drop?.addEventListener('click',()=>file.click()); drop?.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('dragover')}); drop?.addEventListener('dragleave',()=>drop.classList.remove('dragover')); drop?.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('dragover'); handleFile(e.dataTransfer.files[0])}); file?.addEventListener('change',e=>handleFile(e.target.files[0]));
-  const tools=$('#imageTools');
-  function removeSelectedImage(){selected=''; if(preview){preview.remove(); preview=null} if(file)file.value=''; if(drop)drop.innerHTML='Click or drag image here<br><small>PNG, JPG, GIF, WEBP</small>'; tools?.classList.remove('show'); updatePrice(); toast('Image removed')}
-  window.jakwoRemovePreview=removeSelectedImage;
-  $('#changeImage')?.addEventListener('click',()=>file.click()); $('#removeImage')?.addEventListener('click',removeSelectedImage);
-  $('#clearLocalAds')?.addEventListener('click',()=>{if(confirm('Clear local test ads from this browser only?')){localStorage.removeItem('jakwo_local_ads'); location.reload();}});
-  function handleFile(f){if(!f)return; const reader=new FileReader(); reader.onload=()=>{selected=reader.result; if(preview)preview.remove(); preview=placeAd({dataUrl:selected,x:420,y:260,width:Number(w.value)||80,height:Number(h.value)||80},true); drop.innerHTML='Image loaded. Drag it on the arena.'; tools?.classList.add('show'); updatePrice()}; reader.readAsDataURL(f)}
-  $('#applyVoucher')?.addEventListener('click',applyVoucherCode);
-  $('#sendWar')?.addEventListener('click',async()=>{if(!selected){toast('Upload image first');return} if(!walletAddress){await connectWallet(); if(!walletAddress)return} const price=calcPrice(Number(w.value)||80,Number(h.value)||80); if(appliedVoucher){if(price>Number(appliedVoucher.value)){toast('Voucher value too small for this size');return}} else {const ok=confirm(`Demo payment step: publish ${price.toFixed(2)} USDC ad?`); if(!ok)return}
-    const ad={ad_name:$('#adName').value||'Untitled War',name:$('#adName').value||'Untitled War',link:$('#adLink').value||'',link_url:$('#adLink').value||'',image_url:selected,x:parseFloat(preview.style.left)||200,y:parseFloat(preview.style.top)||200,width:Number(w.value)||80,height:Number(h.value)||80,w:Number(w.value)||80,h:Number(h.value)||80,price:appliedVoucher?0:price,wallet:walletAddress,payment_type:appliedVoucher?'promo':'paid',promo_code:appliedVoucher?.code||null,created_at:new Date().toISOString()};
-    let saved=await supaInsert('war_ads',ad); if(appliedVoucher){await burnVoucher(appliedVoucher.code,walletAddress);}
-    if(!saved){const local=JSON.parse(localStorage.getItem('jakwo_local_ads')||'[]');local.push(ad);localStorage.setItem('jakwo_local_ads',JSON.stringify(local))}
-    triggerImpact(price, appliedVoucher? 'PROMO WAR': ad.ad_name); toast(appliedVoucher?'Voucher war published':'War placed'); setTimeout(()=>location.href='index.html',1000);
-  }); updatePrice();}
-function updatePayButton(){const b=$('#sendWar'); if(!b)return; if(appliedVoucher){b.textContent='PUBLISH FREE WITH VOUCHER 🚀'} else b.textContent='PAY & PUBLISH WAR 🚀'}
-async function applyVoucherCode(){if(!walletAddress){await connectWallet(); if(!walletAddress)return} const code=($('#voucherCode')?.value||'').trim().toUpperCase(); const status=$('#voucherStatus'); if(!code){status.textContent='Enter voucher code.';return} const rows=await supaSelect('promo_codes',`select=*&code=eq.${encodeURIComponent(code)}&limit=1`); const v=rows[0]; if(!v){status.textContent='Invalid voucher code.';return} if(v.used||v.disabled){status.textContent='Voucher already used or disabled.';return} const claims=await supaSelect('promo_claims',`select=*&wallet=eq.${encodeURIComponent(walletAddress)}&limit=1`); if(claims.length){status.textContent='This wallet already used a voucher.';return} const price=calcPrice(Number($('#adW')?.value)||80,Number($('#adH')?.value)||80); if(price>Number(v.value)){status.textContent=`Voucher covers up to ${Number(v.value)} USDC. Reduce size.`;return} appliedVoucher=v; status.textContent=`Voucher applied: ${v.tier} (${Number(v.value)} USDC arena credit).`; updatePayButton()}
-async function burnVoucher(code,wallet){await supaPatch('promo_codes',`code=eq.${encodeURIComponent(code)}`,{used:true,used_by:wallet,used_at:new Date().toISOString()}); await supaInsert('promo_claims',{code,wallet,used_at:new Date().toISOString()})}
-function triggerImpact(price=0,name='New War'){localStorage.setItem('jakwo_last_impact',JSON.stringify({time:Date.now(),price,name})); playImpact(price,name)}
-function checkImpact(){try{const i=JSON.parse(localStorage.getItem('jakwo_last_impact')||'null'); if(i&&Date.now()-i.time<6000){playImpact(i.price,i.name); localStorage.removeItem('jakwo_last_impact')}}catch(e){}}
-function playImpact(price=0,name='New War'){const root=$('.site')||$('.upload-site')||document.body; const box=$('#warImpact'); if(box){box.querySelector('.impact-text').textContent= price>=1000000?'TSUNAMI ALERT': price>=1000?'WARLORD ENTERED':'WAR DECLARED'; box.classList.add('active'); setTimeout(()=>box.classList.remove('active'),1300)} root.classList.add('impact'); setTimeout(()=>root.classList.remove('impact'),1200); $$('.meme-card').forEach((m,i)=>{if(Math.random()<(.35+Math.min(Number(price)/1000,.45))){m.classList.remove('fall'); void m.offsetWidth; m.classList.add('fall'); const x=parseFloat(m.style.left)||0; const y=parseFloat(m.style.top)||0; setTimeout(()=>{m.style.left=(x+(Math.random()*80-40))+'px';m.style.top=(y+(Math.random()*80+25))+'px';m.classList.remove('fall')},1800)}}); if(navigator.vibrate&&price>=1000) navigator.vibrate([150,80,150]);}
-async function chatSend(){if(!walletAddress){toast('Connect Phantom to chat');return} const input=$('#chatText'); if(!input?.value.trim())return; if(/https?:\/\//i.test(input.value)){toast('No links in chat');return} const safe=escapeHtml(input.value.trim()).slice(0,160); const box=$('#chatMessages'); const p=document.createElement('p'); p.innerHTML=`<b>${short(walletAddress)}:</b> ${safe}`; box.appendChild(p); input.value=''; box.scrollTop=box.scrollHeight; await supaInsert('chat_messages',{wallet:walletAddress,message:safe,name:short(walletAddress),created_at:new Date().toISOString()})}
-function initAdmin(){const btn=$('#adminEnter'); if(!btn)return; btn.addEventListener('click',()=>{if($('#adminPassword').value===CFG.ADMIN_PASSWORD){$('#adminLogin').style.display='none';$('#adminPanel').style.display='block'; loadAdmin()}else toast('Wrong admin password')})}
-async function loadAdmin(){const wrap=$('#voucherTiers'); if(!wrap)return; const codes=await supaSelect('promo_codes','select=*&order=created_at.desc&limit=500'); wrap.innerHTML=''; TIERS.forEach(t=>{const generated=codes.filter(c=>Number(c.value)===Number(t.value)).length; const used=codes.filter(c=>Number(c.value)===Number(t.value)&&c.used).length; const left=Math.max(0,t.max-generated); const card=document.createElement('div'); card.className='tier-card'; card.style.borderColor=t.color; card.innerHTML=`<h3 style="color:${t.color}">$${t.value}</h3><p><b>${t.label}</b></p><p>Generated: <strong>${generated}/${t.max}</strong></p><p>Used: ${used}</p><p>Remaining: ${left}</p><input type="number" min="1" max="${left}" value="1" ${left<=0?'disabled':''}><button class="btn purple" ${left<=0?'disabled':''}>GENERATE</button>`; card.querySelector('button').addEventListener('click',async()=>{const n=Math.min(Number(card.querySelector('input').value)||1,left); await generateCodes(t,n); await loadAdmin()}); wrap.appendChild(card)}); renderCodes(codes)}
-async function generateCodes(t,n){for(let i=0;i<n;i++){const code=`JAKWO-${String(t.value).replace('.','P')}-${Math.random().toString(36).slice(2,6).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`; await supaInsert('promo_codes',{code,tier:t.label,value:t.value,max_value:t.value,used:false,disabled:false,created_at:new Date().toISOString()})} toast(`${n} codes generated`)}
-function renderCodes(codes){const table=$('#codeTable'); if(!table)return; if(!codes.length){table.innerHTML='No codes yet.';return} table.innerHTML='<div class="code-row"><b>CODE</b><b>TIER</b><b>VALUE</b><b>STATUS</b><b>COPY</b></div>'+codes.slice(0,80).map(c=>`<div class="code-row"><span>${escapeHtml(c.code)}</span><span>${escapeHtml(c.tier||'')}</span><span>$${Number(c.value)}</span><span>${c.disabled?'Disabled':c.used?'Used':'Unused'}</span><button onclick="navigator.clipboard.writeText('${c.code}')">Copy</button></div>`).join('')}
-function initStory(){ $$('.story-img').forEach(img=>img.addEventListener('click',()=>showLightbox(img.src))) }
-document.addEventListener('DOMContentLoaded',()=>{initLinks(); updateWalletButtons(); loadStats(); initHome(); initUpload(); loadAds(); initAdmin(); initStory(); $$('.connect-btn').forEach(b=>b.addEventListener('click',connectWallet)); $$('.panel-open').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel))); $$('.panel-close').forEach(b=>b.addEventListener('click',()=>closePanel(b.dataset.panel))); $('#chatSend')?.addEventListener('click',chatSend);});
+function openSheet(){ $('#sheet')?.classList.add('open'); }
+function closeSheet(){ $('#sheet')?.classList.remove('open'); }
+function loadImage(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { state.image = e.target.result; $('#adPreview').src = state.image; $('#userAd').classList.remove('hidden'); closeSheet(); updateAdSize(); };
+  reader.readAsDataURL(file);
+}
+function updateAdSize(){
+  const ad = $('#userAd'); if(!ad) return;
+  const bf = $('#battlefield');
+  const area = bf.clientWidth * bf.clientHeight * (state.coverage/100);
+  const ratio = 1.55;
+  const w = Math.sqrt(area*ratio); const h = w/ratio;
+  ad.style.width = Math.max(40, Math.min(w, bf.clientWidth))+'px';
+  ad.style.height = Math.max(30, Math.min(h, bf.clientHeight))+'px';
+}
+function makeDraggable(el){
+  let sx=0,sy=0,ox=0,oy=0,drag=false;
+  el.addEventListener('pointerdown', e=>{ if(e.target.classList.contains('remove')) return; drag=true; el.setPointerCapture(e.pointerId); sx=e.clientX; sy=e.clientY; ox=el.offsetLeft; oy=el.offsetTop; });
+  el.addEventListener('pointermove', e=>{ if(!drag) return; const bf=$('#battlefield'); let x=ox+e.clientX-sx; let y=oy+e.clientY-sy; x=Math.max(0,Math.min(x,bf.clientWidth-el.offsetWidth)); y=Math.max(0,Math.min(y,bf.clientHeight-el.offsetHeight)); el.style.left=x+'px'; el.style.top=y+'px'; });
+  el.addEventListener('pointerup', ()=>drag=false);
+}
+function deploy(){
+  if(!state.image) return alert('Choose image first.');
+  if(!state.wallet) return alert('Connect wallet first.');
+  $('#confirmBtn').classList.remove('hidden');
+  $('#deployBtn').textContent='PREVIEW ON ARENA';
+}
+function confirmDeploy(){
+  if(state.coverage >= 100){ alert('🚨 TSUNAMI ALERT: 1M DOMINATOR ACTIVE. Arena lockdown would start now.'); }
+  impact();
+  closeSheet();
+  state.deployed = true;
+  $('#confirmBtn').classList.add('hidden');
+  $('#deployBtn').textContent='DEPLOY TO WAR';
+  const count = Number(localStorage.getItem('jakwo_ads')||0)+1;
+  localStorage.setItem('jakwo_ads', count); $('#totalAds').textContent = count;
+  $('#latestWar').textContent = 'YOUR AD';
+  alert('✅ Ad deployed! Your weapon is now live in the arena.');
+}
+function impact(){
+  document.body.classList.add('impact');
+  const cards = $$('.meme-card');
+  cards.sort(()=>Math.random()-.5).slice(0, state.coverage>30?5:2).forEach(c=>c.classList.add('fall'));
+  if(navigator.vibrate) navigator.vibrate(state.coverage>=100?[300,100,300,100,600]:[80,60,120]);
+  setTimeout(()=>document.body.classList.remove('impact'), 1200);
+}
+function panel(type){
+  const content = $('#panelContent');
+  const box = {
+    rules:`<h2>RULES OF THE ARENA</h2><p>Ads are permanent. No refunds. No edit after deploy. Ads can be covered by newer ads. No phishing, malware, illegal content, hate, impersonation, or scam links.</p>`,
+    chat:`<h2>WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><input placeholder='Connect wallet to chat' style='width:100%;padding:14px;background:#080a0d;color:#fff;border:1px solid #333;border-radius:8px'>`,
+    lords:`<h2>TOP WARLORDS</h2><p>#1 NONE YET<br>#2 OPEN<br>#3 OPEN</p>`
+  }[type] || '<h2>JAKWO</h2>';
+  content.innerHTML = box; $('#panel').classList.remove('hidden');
+}
+function initAdmin(){
+  if(!location.pathname.includes('admin')) return;
+  const codes = JSON.parse(localStorage.getItem('jakwo_codes')||'[]');
+  window.generateCodes = function(tier,max,count){
+    const existing = codes.filter(c=>c.tier===tier).length;
+    const can = Math.max(0, Math.min(count, max-existing));
+    for(let i=0;i<can;i++) codes.push({code:`JAKWO-${tier}-${String(existing+i+1).padStart(4,'0')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`,tier,used:false});
+    localStorage.setItem('jakwo_codes', JSON.stringify(codes)); renderCodes();
+  }
+  window.renderCodes = function(){ const out=$('#codes'); if(out) out.textContent = JSON.stringify(codes,null,2); }
+  renderCodes();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  $('#xLink') && ($('#xLink').href = cfg.TWITTER || '#'); $('#tgLink') && ($('#tgLink').href = cfg.TELEGRAM || '#');
+  syncWallet(); updatePrice(); $('#totalAds') && ($('#totalAds').textContent = localStorage.getItem('jakwo_ads') || '0');
+  $('#connectBtn')?.addEventListener('click', connectWallet);
+  $('#placeAdBtn')?.addEventListener('click', openSheet); $('#closeSheet')?.addEventListener('click', closeSheet);
+  $('#imageInput')?.addEventListener('change',e=>loadImage(e.target.files[0])); $('#fileInput')?.addEventListener('change',e=>loadImage(e.target.files[0]));
+  $('#coverageSlider')?.addEventListener('input',e=>{ state.coverage=Number(e.target.value); updatePrice(); updateAdSize(); });
+  $('#deployBtn')?.addEventListener('click', deploy); $('#confirmBtn')?.addEventListener('click', confirmDeploy);
+  $('#removeAd')?.addEventListener('click',()=>{$('#userAd').classList.add('hidden'); state.image='';});
+  $$('.side-rail button,.mobile-nav button').forEach(b=>b.addEventListener('click',()=>panel(b.dataset.panel)));
+  $('#closePanel')?.addEventListener('click',()=>$('#panel').classList.add('hidden'));
+  $$('.meme-card').forEach(card=>{ makeDraggable(card); card.addEventListener('click',()=>{card.style.transition='transform .45s'; card.style.transform=`rotate(${Math.random()*40-20}deg) scale(${.95+Math.random()*.2})`; setTimeout(()=>card.style.transition='',500);}); });
+  $('#userAd') && makeDraggable($('#userAd'));
+  initAdmin();
+});
