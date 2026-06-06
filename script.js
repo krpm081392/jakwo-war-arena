@@ -636,69 +636,14 @@
   }
 
   function makeInteractive(el){
-    let dragging=false, resizing=false, pendingTouch=false;
-    let sx=0, sy=0, sl=0, st=0, sw=0, sh=0, dragOffsetX=0, dragOffsetY=0, activePointer=null, holdTimer=null;
+    let dragging=false, resizing=false;
+    let sx=0, sy=0, sl=0, st=0, sw=0, sh=0, dragOffsetX=0, dragOffsetY=0, activePointer=null;
+    let raf=0, lastEvent=null, priceDirty=false;
 
-    const clearHold = () => { if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } pendingTouch=false; };
-    const stop = (e) => {
-      clearHold();
-      dragging = false;
-      resizing = false;
-      try{ if(activePointer !== null) el.releasePointerCapture?.(activePointer); }catch(_e){}
-      activePointer = null;
-      document.body.classList.remove('dragging-ad');
-    };
-    const beginMove = (e, mode) => {
-      // Use offsetLeft/offsetTop instead of parsing style %, otherwise touch/mouse can jump to top-left.
-      sx=e.clientX; sy=e.clientY; sl=el.offsetLeft || 0; st=el.offsetTop || 0; sw=el.offsetWidth; sh=el.offsetHeight;
-      dragOffsetX = e.clientX - sl;
-      dragOffsetY = e.clientY - st;
-      resizing = mode === 'resize';
-      dragging = mode === 'drag';
-      activePointer = e.pointerId;
-      el.dataset.budgetMode='0';
-      try{ el.setPointerCapture?.(e.pointerId); }catch(_e){}
-      document.body.classList.add('dragging-ad');
-    };
-    const down = (e) => {
-      if(el.classList.contains('locked')) return;
-      if(e.pointerType === 'mouse' && e.button !== 0) return;
-      const t = e.target;
-      if(t.classList.contains('x')){ el.remove(); if(currentAd===el) currentAd=null; updatePrice(); return; }
-      clearHold();
-
-      if(t.classList.contains('resize')){
-        beginMove(e, 'resize');
-        e.preventDefault();
-        return;
-      }
-
-      // Phone: require a tiny hold before moving so normal panning doesn't accidentally throw the photo.
-      if(e.pointerType === 'touch'){
-        pendingTouch = true;
-        activePointer = e.pointerId;
-        sx=e.clientX; sy=e.clientY;
-        holdTimer = setTimeout(() => {
-          if(pendingTouch) beginMove(e, 'drag');
-        }, 170);
-        return;
-      }
-
-      beginMove(e, 'drag');
-      e.preventDefault();
-    };
-    const move = (e) => {
-      if(el.classList.contains('locked')) return stop(e);
-      if(activePointer !== null && e.pointerId !== activePointer) return;
-
-      if(pendingTouch && !dragging && !resizing){
-        const moved = Math.hypot(e.clientX - sx, e.clientY - sy);
-        // If user swipes instead of holds, cancel photo drag and let arena pan.
-        if(moved > 12) stop(e);
-        return;
-      }
-
-      if(!dragging && !resizing) return;
+    const applyMove = () => {
+      raf = 0;
+      const e = lastEvent;
+      if(!e || (!dragging && !resizing)) return;
       const dx=e.clientX-sx, dy=e.clientY-sy;
       if(resizing){
         el.dataset.manualPrice = '';
@@ -713,10 +658,51 @@
         el.style.left = Math.min(maxX, Math.max(0, e.clientX - dragOffsetX))+'px';
         el.style.top = Math.min(maxY, Math.max(0, e.clientY - dragOffsetY))+'px';
       }
-      updatePrice();
+      priceDirty = true;
+    };
+
+    const stop = () => {
+      dragging = false;
+      resizing = false;
+      if(raf){ cancelAnimationFrame(raf); raf=0; applyMove(); }
+      try{ if(activePointer !== null) el.releasePointerCapture?.(activePointer); }catch(_e){}
+      activePointer = null;
+      lastEvent = null;
+      document.body.classList.remove('dragging-ad');
+      if(priceDirty){ priceDirty=false; updatePrice(); }
+    };
+
+    const beginMove = (e, mode) => {
+      sx=e.clientX; sy=e.clientY; sl=el.offsetLeft || 0; st=el.offsetTop || 0; sw=el.offsetWidth; sh=el.offsetHeight;
+      dragOffsetX = e.clientX - sl;
+      dragOffsetY = e.clientY - st;
+      resizing = mode === 'resize';
+      dragging = mode === 'drag';
+      activePointer = e.pointerId;
+      el.dataset.budgetMode='0';
+      try{ el.setPointerCapture?.(e.pointerId); }catch(_e){}
+      document.body.classList.add('dragging-ad');
+    };
+
+    const down = (e) => {
+      if(el.classList.contains('locked')) return;
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      const t = e.target;
+      if(t.classList.contains('x')){ el.remove(); if(currentAd===el) currentAd=null; updatePrice(); return; }
+      beginMove(e, t.classList.contains('resize') ? 'resize' : 'drag');
       e.preventDefault();
     };
-    el.addEventListener('pointerdown', down);
+
+    const move = (e) => {
+      if(el.classList.contains('locked')) return stop();
+      if(activePointer !== null && e.pointerId !== activePointer) return;
+      if(!dragging && !resizing) return;
+      lastEvent = e;
+      if(!raf) raf = requestAnimationFrame(applyMove);
+      e.preventDefault();
+    };
+
+    el.addEventListener('pointerdown', down, {passive:false});
     window.addEventListener('pointermove', move, {passive:false});
     window.addEventListener('pointerup', stop);
     window.addEventListener('pointercancel', stop);
@@ -783,9 +769,10 @@
     const c = cleanVoucher(code);
     if(!c) return 0;
     if(c === 'TEST') return 0.5;
-    const m = c.match(/(?:^|[-_\s])(1000000|1000|500|100|0\.5|050|50|5)(?:$|[-_\s])/);
+    // Admin generates codes like JAKWO-500-XXXXX-001 and JAKWO-0D5-XXXXX-001
+    const m = c.match(/(?:^|[-_\s])(1000000|1000|500|100|0D5|0\.5|050)(?:$|[-_\s])/);
     if(!m) return 0;
-    if(m[1] === '050') return 0.5;
+    if(m[1] === '0D5' || m[1] === '0.5' || m[1] === '050') return 0.5;
     return Number(m[1]);
   }
   async function lookupVoucher(code){
@@ -798,7 +785,7 @@
     }
     try{
       // Use limit(1), not .single(), so unused/invalid vouchers do not throw 406.
-      const { data, error } = await supa.from('voucher_codes').select('*').eq('code', c).limit(1);
+      const { data, error } = await supa.from('voucher_codes').select('id,code,tier,used,disabled,used_by,used_at').eq('code', c).limit(1);
       if(error){ console.warn('Voucher lookup error:', error); return { ok:false, reason:'invalid', error, tier:0 }; }
       const row = Array.isArray(data) && data.length ? data[0] : null;
       if(!row) return { ok:false, reason:'invalid', tier:0 };
@@ -1031,11 +1018,19 @@
 
     if(voucher){
       markVoucherUsed(voucher);
-      if(supa && deployedAd.dataset.voucherId){
+      if(supa){
         try{
-          await supa.from('voucher_codes').update({ used:true, used_by: wallet, used_at: new Date().toISOString() }).eq('id', deployedAd.dataset.voucherId);
+          const updatePayload = { used:true, used_by: wallet, used_at: new Date().toISOString() };
+          let q = supa.from('voucher_codes').update(updatePayload);
+          if(deployedAd.dataset.voucherId) q = q.eq('id', deployedAd.dataset.voucherId);
+          else q = q.eq('code', voucher);
+          const { error } = await q;
+          if(error) throw error;
           setVoucherStatus('✅ Voucher used and burned', 'ok');
-        }catch(e){ console.warn('Voucher update failed:', e); }
+        }catch(e){
+          console.warn('Voucher update failed:', e);
+          setVoucherStatus('⚠️ Ad deployed, but voucher status update failed. Check admin.', 'bad');
+        }
       } else {
         setVoucherStatus('✅ Voucher used', 'ok');
       }

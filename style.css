@@ -428,3 +428,14 @@ body.dragging-ad{cursor:grabbing!important;user-select:none!important;}
   .ad.editing .x{width:34px!important;height:34px!important;right:-17px!important;top:-17px!important;font-size:18px!important;}
   .ad.editing .resize{width:28px!important;height:28px!important;right:-14px!important;bottom:-14px!important;}
 }
+
+/* Phone drag performance patch: only affects unpaid preview interaction */
+.ad.editing{
+  touch-action:none;
+  will-change:left, top, width, height;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.dragging-ad .ad.editing{
+  transition:none !important;
+}
