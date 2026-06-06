@@ -249,6 +249,10 @@
     const visibleAdArea = Math.max(1, iw * ih);
     let coverage = Math.min(100, Math.max(.00005, (visibleAdArea / arenaArea) * 100));
     let price = priceFromArea(visibleAdArea);
+    const manual = Number(el.dataset.manualPrice || 0);
+    if(Number.isFinite(manual) && manual >= 0.5){
+      price = Math.max(0.5, Math.min(1000000, manual));
+    }
     return {coverage, price};
   }
   function activeVoucherValue(){
@@ -401,7 +405,7 @@
     ad.style.left = '14%'; ad.style.top = '18%'; ad.style.width = '40px'; ad.style.height = '40px';
     ad.innerHTML = `<button class="x" title="Remove">×</button><img src="${src}" alt="war ad"><span class="resize"></span>`;
     arena.appendChild(ad);
-    currentAd = ad; ad.dataset.budgetMode='0'; const bi=$('#budgetInput'); if(bi) bi.value=''; makeInteractive(ad); updatePrice();
+    currentAd = ad; ad.dataset.budgetMode='0'; ad.dataset.manualPrice=''; const bi=$('#budgetInput'); if(bi) bi.value=''; makeInteractive(ad); updatePrice();
   }
   function getLocalAds(){
     try { return JSON.parse(localStorage.getItem(ADS_KEY) || '[]'); } catch(_e){ return []; }
@@ -498,7 +502,11 @@
       if(el.classList.contains('locked')) return;
       if(!dragging && !resizing) return;
       const p = e.touches ? e.touches[0] : e; const dx=p.clientX-sx, dy=p.clientY-sy;
-      if(resizing){ el.style.width = Math.max(40, sw+dx)+'px'; el.style.height = Math.max(40, sh+dy)+'px'; }
+      if(resizing){
+        el.dataset.manualPrice = '';
+        el.style.width = Math.max(40, sw+dx)+'px';
+        el.style.height = Math.max(40, sh+dy)+'px';
+      }
       if(dragging){ el.style.left = Math.max(0, sl+dx)+'px'; el.style.top = Math.max(0, st+dy+arena.scrollTop)+'px'; }
       updatePrice(); e.preventDefault();
     };
@@ -571,6 +579,7 @@
     if(!currentAd || !target) return;
     const clamped = Math.max(0.5, Math.min(1000000, Number(target) || 0.5));
     const input = $('#budgetInput'); if(input && updateInput) input.value = formatBudgetValue(clamped);
+    currentAd.dataset.manualPrice = String(clamped);
     const ar = arena.getBoundingClientRect();
     if(clamped >= 999999.99){
       // 1M = exactly the whole visible arena field.
@@ -606,13 +615,32 @@
       throw new Error('solanaWeb3 missing');
     }
     const web3 = window.solanaWeb3;
-    const rpc = config.solanaRpc || config.NEXT_PUBLIC_SOLANA_RPC || 'https://api.mainnet-beta.solana.com';
+    const rpcList = [
+      config.solanaRpc,
+      config.NEXT_PUBLIC_SOLANA_RPC,
+      'https://solana-rpc.publicnode.com',
+      'https://rpc.ankr.com/solana',
+      'https://api.mainnet-beta.solana.com'
+    ].filter(Boolean);
     const receiverWallet = config.receiverWallet || config.NEXT_PUBLIC_RECEIVER_WALLET || '';
     if(!receiverWallet){
       alert('Receiver wallet missing in config.js');
       throw new Error('receiver wallet missing');
     }
-    const connection = new web3.Connection(rpc, 'confirmed');
+    let connection = null;
+    let lastRpcError = null;
+    for(const rpc of rpcList){
+      try{
+        const test = new web3.Connection(rpc, 'confirmed');
+        await test.getLatestBlockhash('confirmed');
+        connection = test;
+        break;
+      }catch(e){ lastRpcError = e; console.warn('RPC failed, trying next:', rpc, e); }
+    }
+    if(!connection){
+      alert('Solana RPC is blocked or unavailable. Try again, or use a custom RPC in config.js.');
+      throw lastRpcError || new Error('No working Solana RPC');
+    }
     const payer = provider.publicKey;
     const receiver = new web3.PublicKey(receiverWallet);
     const mint = new web3.PublicKey(config.usdcMint || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
@@ -775,6 +803,7 @@
     if(Number.isFinite(v) && v >= 0.5){
       v = Math.max(0.5, Math.min(1000000, v));
       resizeAdToPrice(v, false);
+      if(currentAd) currentAd.dataset.manualPrice = String(v);
     }
   };
   budgetEl?.addEventListener('input', applyBudget);
