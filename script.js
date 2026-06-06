@@ -273,6 +273,10 @@
     const input = $('#voucherCode');
     return input ? voucherValue(input.value) : 0;
   }
+  function formatMoney(v){
+    const n = Math.max(0, Number(v) || 0);
+    return n.toLocaleString(undefined, { minimumFractionDigits: n < 1 ? 2 : 0, maximumFractionDigits: 2 });
+  }
   function formatBudgetValue(v){
     const n = Math.max(0.5, Math.min(1000000, Number(v) || 0.5));
     if(n >= 1000000) return '1000000';
@@ -485,7 +489,7 @@
     const rec = adRecordFromElement(el, amount);
     el.dataset.id = rec.id;
 
-    // Always keep a local backup first so refresh on the same device never loses the ad.
+    // Always keep local backup first. Even if Supabase fails, refresh on same device keeps the paid ad.
     const rows = getLocalAds().filter(a => a.id !== rec.id);
     rows.push(rec);
     setLocalAds(rows);
@@ -493,39 +497,39 @@
     if(supa){
       try{
         const voucherCode = cleanVoucher($('#voucherCode')?.value || '') || null;
-        const baseRec = {
+        const tx = el.dataset.tx || null;
+        const common = {
           image_url: rec.image_url,
           link: rec.link,
           wallet: rec.wallet,
           amount: rec.amount,
           x: rec.x, y: rec.y, w: rec.w, h: rec.h,
           name: rec.name,
-          locked: true,
-          voucher_code: voucherCode,
-          tx_signature: el.dataset.tx || null
+          locked: true
         };
-
-        // Try the newer percent-position columns first.
-        let dbRec = { ...baseRec, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent };
-        let { error } = await supa.from('ads').insert(dbRec);
-
-        // If user's Supabase table has not been upgraded yet, fall back to old columns only.
-        if(error){
-          console.warn('Supabase ad save with percent columns failed, retrying legacy columns:', error);
-          ({ error } = await supa.from('ads').insert(baseRec));
+        const tries = [
+          { ...common, voucher_code: voucherCode, tx_signature: tx, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent },
+          { ...common, voucher_code: voucherCode, tx_signature: tx },
+          { ...common }
+        ];
+        let saved = false, lastError = null;
+        for(const payload of tries){
+          const { error } = await supa.from('ads').insert(payload);
+          if(!error){ saved = true; break; }
+          lastError = error;
+          console.warn('Supabase ad save attempt failed, retrying smaller payload:', error);
         }
-
-        if(error){
-          console.error('Supabase ad save failed:', error);
-          throw error;
+        if(saved){
+          console.log('SUPABASE AD SAVED');
+        } else {
+          console.error('Supabase ad save failed after retries:', lastError);
         }
-
-        console.log('SUPABASE AD SAVED');
       }catch(e){
         console.warn('Supabase ad save failed, local save still kept:', e);
       }
     }
   }
+
   async function loadDeployedAds(){
     let rows = [];
     if(supa){
@@ -534,9 +538,19 @@
         if(!error && Array.isArray(data)) rows = data;
       }catch(e){ console.warn('Supabase ad load failed:', e); }
     }
-    if(!rows.length) rows = getLocalAds();
+
+    // Merge local paid/deployed backups with Supabase rows. This prevents a paid ad from disappearing
+    // after refresh if Supabase insert failed or schema still needs updating.
+    const localRows = getLocalAds();
+    const seen = new Set(rows.map(r => String(r.id || r.tx_signature || r.image_url || '')));
+    for(const r of localRows){
+      const key = String(r.id || r.tx_signature || r.image_url || '');
+      if(!seen.has(key)){ rows.push(r); seen.add(key); }
+    }
+
+    arena.querySelectorAll('.ad.locked').forEach(n => n.remove());
     rows.forEach(renderDeployedAd);
-    // Real stats from global rows when Supabase is available.
+
     if(rows.length){
       stats.total = rows.length;
       stats.volume = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
@@ -546,8 +560,10 @@
       rows.forEach(r => { const w = r.wallet || 'Anon'; byWallet[w] = (byWallet[w] || 0) + (Number(r.amount) || 0); });
       const top = Object.entries(byWallet).sort((a,b)=>b[1]-a[1])[0];
       stats.top = top ? (top[0].length > 10 ? shortWallet(top[0]) : top[0]) : 'None';
-      saveStats(); renderStats();
+    } else {
+      stats.total = 0; stats.volume = 0; stats.latest = 'None'; stats.top = 'None';
     }
+    saveStats(); renderStats();
   }
 
   function makeInteractive(el){
@@ -654,9 +670,10 @@
       if(error){ console.warn('Voucher lookup error:', error); return { ok:false, reason:'invalid', error, tier:0 }; }
       const row = Array.isArray(data) && data.length ? data[0] : null;
       if(!row) return { ok:false, reason:'invalid', tier:0 };
-      if(row.disabled) return { ok:false, reason:'disabled', row, tier:Number(row.tier)||0 };
-      if(row.used) return { ok:false, reason:'used', row, tier:Number(row.tier)||0 };
-      return { ok:true, reason:'valid', row, tier:Number(row.tier)||0 };
+      const tier = Number(row.tier ?? row.value ?? row.amount ?? row.price) || voucherValue(c) || 0;
+      if(row.disabled) return { ok:false, reason:'disabled', row, tier };
+      if(row.used) return { ok:false, reason:'used', row, tier };
+      return { ok:true, reason:'valid', row, tier };
     }catch(e){
       console.warn('Voucher lookup exception:', e);
       return { ok:false, reason:'invalid', error:e, tier:0 };
@@ -826,7 +843,12 @@
     const voucher = cleanVoucher($('#voucherCode').value);
     const name = ($('#adName').value || 'Unnamed War Ad').trim().slice(0,40);
     const budgetInput = $('#budgetInput');
-    const budgetVal = budgetInput ? parseMoneyValue(budgetInput.value) : 0;
+    let budgetVal = budgetInput ? parseMoneyValue(budgetInput.value) : 0;
+    if(budgetInput && budgetInput.value.trim() && budgetVal < 0.5){
+      alert('Minimum war price is 0.50 USDC.');
+      budgetInput.value = '0.50';
+      budgetVal = 0.5;
+    }
     if(budgetVal >= 0.5) resizeAdToPrice(budgetVal);
     let p = priceFor(currentAd);
 
@@ -935,7 +957,30 @@
   };
   $('#voucherCode').addEventListener('change', handleVoucherInput);
   $('#voucherCode').addEventListener('input', handleVoucherInput);
-  $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };
+  async function fileToCompressedDataUrl(file){
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          try{
+            const max = 900;
+            const scale = Math.min(1, max / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.72));
+          }catch(_e){ resolve(reader.result); }
+        };
+        img.onerror = () => resolve(reader.result);
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  $('#imageInput').onchange = async (e)=>{ const file=e.target.files[0]; if(!file) return; const dataUrl = await fileToCompressedDataUrl(file); addAd(dataUrl); };
   $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
   $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));
 
