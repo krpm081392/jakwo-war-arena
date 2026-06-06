@@ -6,6 +6,12 @@
   const panel = $('#panel');
   const panelContent = $('#panelContent');
   const config = window.JAKWO_CONFIG || {};
+  // FIXED FOREVER ARENA SIZE: same world on desktop/phone. Screen is only a camera.
+  const ARENA_WIDTH = 5000;
+  const ARENA_HEIGHT = 3000;
+  const ARENA_AREA = ARENA_WIDTH * ARENA_HEIGHT;
+  const MIN_PRICE = 0.50;
+  const MAX_PRICE = 1000000;
   let wallet = localStorage.getItem('jakwo_wallet') || '';
   let currentAd = null;
   let stats = JSON.parse(localStorage.getItem('jakwo_stats_v3_fresh') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
@@ -227,10 +233,9 @@
     return Number.isFinite(v) && v >= 0.5 ? Math.max(0.5, Math.min(1000000, v)) : 0;
   }
   function arenaPricingArea(){
-    // Price must follow the currently visible battlefield, not total document height.
-    // 100% of the visible arena = 1,000,000 USDC. Minimum = 0.50 USDC.
-    const r = arena.getBoundingClientRect();
-    return Math.max(1, r.width * r.height);
+    // Pricing is based on the fixed permanent battlefield, never the device screen.
+    // 5000 x 3000 = 100% arena = 1,000,000 USDC.
+    return ARENA_AREA;
   }
   function minAdArea(){
     // The smallest visible ad on screen is the 0.50 USDC floor.
@@ -254,18 +259,18 @@
     return Math.max(minArea, Math.min(arenaArea, minArea + ratio * (arenaArea - minArea)));
   }
   function priceFor(el){
-    if(!el) return {coverage:.00005, price:.5};
-    const ar = arena.getBoundingClientRect();
-    const er = el.getBoundingClientRect();
-    const iw = Math.max(0, Math.min(er.right, ar.right) - Math.max(er.left, ar.left));
-    const ih = Math.max(0, Math.min(er.bottom, ar.bottom) - Math.max(er.top, ar.top));
+    if(!el) return {coverage:.00005, price:MIN_PRICE};
     const arenaArea = arenaPricingArea();
-    const visibleAdArea = Math.max(1, iw * ih);
-    let coverage = Math.min(100, Math.max(.00005, (visibleAdArea / arenaArea) * 100));
-    let price = priceFromArea(visibleAdArea);
+    // Use world/ad size, not visible viewport size, so laptop/phone/zoom do not change price.
+    const adArea = Math.max(1, (el.offsetWidth || parseFloat(el.style.width) || 40) * (el.offsetHeight || parseFloat(el.style.height) || 40));
+    const clampedArea = Math.max(minAdArea(), Math.min(arenaArea, adArea));
+    let coverage = Math.min(100, Math.max(.00005, (clampedArea / arenaArea) * 100));
+    let price = priceFromArea(clampedArea);
     const manual = Number(el.dataset.manualPrice || 0);
-    if(Number.isFinite(manual) && manual >= 0.5){
-      price = Math.max(0.5, Math.min(1000000, manual));
+    if(Number.isFinite(manual) && manual >= MIN_PRICE){
+      price = Math.max(MIN_PRICE, Math.min(MAX_PRICE, manual));
+      const area = areaFromPrice(price);
+      coverage = Math.min(100, Math.max(.00005, (area / arenaArea) * 100));
     }
     return {coverage, price};
   }
@@ -470,20 +475,16 @@
     localStorage.setItem(ADS_KEY, JSON.stringify(rows || []));
   }
   function arenaSizeForSave(){
-    return {
-      w: Math.max(1, arena.scrollWidth || arena.clientWidth || arena.getBoundingClientRect().width || 1),
-      h: Math.max(1, arena.scrollHeight || arena.clientHeight || arena.getBoundingClientRect().height || 1)
-    };
+    // Fixed forever world size. Do not use screen size here.
+    return { w: ARENA_WIDTH, h: ARENA_HEIGHT };
   }
   function adRecordFromElement(el, amount){
     const img = el.querySelector('img');
     const size = arenaSizeForSave();
-    const ar = arena.getBoundingClientRect();
-    const er = el.getBoundingClientRect();
-    const x = Math.max(0, (er.left - ar.left) + (arena.scrollLeft || 0));
-    const y = Math.max(0, (er.top - ar.top) + (arena.scrollTop || 0));
-    const w = el.offsetWidth || parseFloat(el.style.width) || 40;
-    const h = el.offsetHeight || parseFloat(el.style.height) || 40;
+    const x = Math.max(0, el.offsetLeft || parseFloat(el.style.left) || 0);
+    const y = Math.max(0, el.offsetTop || parseFloat(el.style.top) || 0);
+    const w = Math.max(40, el.offsetWidth || parseFloat(el.style.width) || 40);
+    const h = Math.max(40, el.offsetHeight || parseFloat(el.style.height) || 40);
     return {
       id: el.dataset.id || ('ad_' + Date.now() + '_' + Math.random().toString(16).slice(2)),
       image_url: img ? img.src : '',
@@ -727,13 +728,12 @@
     const clamped = Math.max(0.5, Math.min(1000000, Number(target) || 0.5));
     const input = $('#budgetInput'); if(input && updateInput) input.value = formatBudgetValue(clamped);
     currentAd.dataset.manualPrice = String(clamped);
-    const ar = arena.getBoundingClientRect();
     if(clamped >= 999999.99){
-      // 1M = exactly the whole visible arena field.
-      currentAd.style.left = Math.max(0, arena.scrollLeft) + 'px';
-      currentAd.style.top = Math.max(0, arena.scrollTop) + 'px';
-      currentAd.style.width = Math.round(arena.clientWidth || ar.width) + 'px';
-      currentAd.style.height = Math.round(arena.clientHeight || ar.height) + 'px';
+      // 1M = exactly the whole fixed battlefield, not the current screen.
+      currentAd.style.left = '0px';
+      currentAd.style.top = '0px';
+      currentAd.style.width = ARENA_WIDTH + 'px';
+      currentAd.style.height = ARENA_HEIGHT + 'px';
       updatePrice();
       return;
     }
