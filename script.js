@@ -517,10 +517,13 @@
     try{
       if(wallet){
         if(confirm('Disconnect wallet?')){
-          try{ await (window.solana || window.phantom?.solana)?.disconnect?.(); }catch(_e){}
+          const provider = window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null);
+          try{ await provider?.disconnect?.(); }catch(_e){}
           wallet = '';
           localStorage.removeItem('jakwo_wallet');
+          sessionStorage.removeItem('jakwo_wallet');
           updateWallet();
+          alert('Wallet disconnected from JAKWO.');
         }
         return;
       }
@@ -615,12 +618,14 @@
       throw new Error('solanaWeb3 missing');
     }
     const web3 = window.solanaWeb3;
+    // Prefer public RPCs first. api.mainnet-beta.solana.com often returns 403/rate-limit on Vercel/browser.
+    const configuredRpc = config.solanaRpc || config.NEXT_PUBLIC_SOLANA_RPC || '';
     const rpcList = [
-      config.solanaRpc,
-      config.NEXT_PUBLIC_SOLANA_RPC,
-      'https://solana-rpc.publicnode.com',
+      configuredRpc && !configuredRpc.includes('api.mainnet-beta.solana.com') ? configuredRpc : '',
       'https://rpc.ankr.com/solana',
-      'https://api.mainnet-beta.solana.com'
+      'https://solana-rpc.publicnode.com',
+      'https://solana.public-rpc.com',
+      configuredRpc && configuredRpc.includes('api.mainnet-beta.solana.com') ? configuredRpc : ''
     ].filter(Boolean);
     const receiverWallet = config.receiverWallet || config.NEXT_PUBLIC_RECEIVER_WALLET || '';
     if(!receiverWallet){
@@ -703,7 +708,24 @@
       const signed = await provider.signTransaction(tx);
       sig = await connection.sendRawTransaction(signed.serialize());
     }
-    await connection.confirmTransaction({ signature: sig, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight }, 'confirmed');
+    // Do not lose the ad if Phantom already sent/paid but RPC confirmation expires.
+    // We still try to confirm, but if confirmation times out/BlockheightExceeded happens,
+    // deploy continues with the transaction signature so the buyer receives the ad.
+    try{
+      await connection.confirmTransaction({ signature: sig, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight }, 'confirmed');
+    }catch(confirmErr){
+      console.warn('Payment was sent but confirmation failed/expired. Continuing deploy with signature:', sig, confirmErr);
+      // Best-effort status check across backup RPCs. If unavailable, still continue with signature.
+      for(const rpc of rpcList){
+        try{
+          const c = new web3.Connection(rpc, 'confirmed');
+          const st = await c.getSignatureStatuses([sig], { searchTransactionHistory:true });
+          const v = st && st.value && st.value[0];
+          if(v && v.err){ throw new Error('Transaction failed: ' + JSON.stringify(v.err)); }
+          if(v && (v.confirmationStatus === 'confirmed' || v.confirmationStatus === 'finalized')) break;
+        }catch(statusErr){ console.warn('Signature status check failed on RPC:', rpc, statusErr); }
+      }
+    }
     return sig;
   }
 
@@ -781,7 +803,9 @@
       }
     }
     if(paymentSignature) deployedAd.dataset.tx = paymentSignature;
+    console.log('PAYMENT OK, SAVING AD...', { paymentSignature, price:p.price, voucher });
     await saveDeployedAd(deployedAd, voucher ? 0 : p.price);
+    console.log('AD SAVE STEP FINISHED');
     $('#voucherCode').value = '';
     stats.total += 1; stats.volume += voucher ? 0 : Number(p.price || 0); stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name, voucher ? 0 : p.price); impact(voucher ? 0 : p.price); closeSheet(); currentAd=null; updatePrice();
     $('#deployBtn').disabled = false;
