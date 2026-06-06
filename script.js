@@ -23,16 +23,127 @@
   })();
 
   const storyHTML = `
-    <h2>THE STORY OF JAKWO</h2>
-    <p>At first, Wojak was only a face — a tired shape the internet used when words were not enough.</p>
-    <p>He became every loss, every late night, every silent laugh, every failure people were too embarrassed to explain.</p>
-    <p>But beneath the meme was Jakwo: the one who still felt. The one who watched every brand, coin, creator, troll, and dream fight for attention in a world that never stopped scrolling.</p>
-    <p>Then the internet became a battlefield. Memes became weapons. Attention became territory. Every image became a flag planted into history.</p>
-    <p>JAKWO War Ads Arena was created for that war. Not a clean billboard. Not a boring ad slot. A permanent battlefield where anyone can place an image, attach a link, and fight for visibility.</p>
-    <p>Some ads will rise. Some will be buried. Some will be covered by bigger attacks. But every placed ad becomes part of the arena's history.</p>
-    <h2>BUY. PLACE. BLOCK. REPEAT.</h2>
-    <p>This is not just advertising. This is internet territory.</p>`;
+    <h2>Jakwo and Wojak Story</h2>
+    <p>They said he was always talking to himself.</p>
+    <p>Not loudly, not like someone losing their mind—just softly, as if trying to convince the air that it could understand him.</p>
+    <p>In those murmurs lived two voices.</p>
+    <p>One called itself Wojak, the other Jakwo.</p>
+    <p>No one else could tell them apart, but inside his head they felt like separate people sharing the same heartbeat.</p>
+    <p>At first they agreed on everything.</p>
+    <p>Wojak handled the noise of the world—the jokes, the routines, the practiced smiles.</p>
+    <p>Jakwo preferred the quiet corners, sketching thoughts in notebooks, writing the words that Wojak could never say aloud.</p>
+    <p>Together they made one whole person: visible and invisible, loud and still.</p>
+    <p>But the world doesn't reward stillness.</p>
+    <p>Every room, every screen, every friend wanted the bright half, the one who could make sadness sound funny.</p>
+    <p>So Wojak stepped forward more and more, until Jakwo had to shrink just to make space.</p>
+    <p>At night, when the house was silent, Jakwo whispered back:</p>
+    <blockquote>You're forgetting where the feelings come from.</blockquote>
+    <p>Wojak smiled at the dark ceiling.</p>
+    <blockquote>Someone has to keep us alive.</blockquote>
+    <p>The next morning, only Wojak's name was written on the coffee cup.</p>
 
+    <h2>The Becoming</h2>
+    <p>Days began to blur into one another.</p>
+    <p>Wojak laughed in the mirror every morning, testing expressions like an actor rehearsing a part.</p>
+    <p>He learned which smiles earned him company, which tired shrug made people call him "relatable."</p>
+    <p>Every reaction from others felt like applause.</p>
+    <p>He started to believe that applause was the same thing as love.</p>
+    <p>Jakwo stayed in the corners of their shared mind, watching.</p>
+    <p>He could still feel everything—each embarrassment, each tiny rejection—but he wasn't allowed to speak.</p>
+    <p>Whenever he tried to rise, Wojak covered him with a joke, a meme, a quick line to change the subject.</p>
+    <p>It worked. People liked Wojak.</p>
+    <p>Online, it was even easier.</p>
+    <p>A single image, a sad face sketched in black lines, could carry whole oceans of feeling.</p>
+    <p>People reposted it, captioned it, remade it.</p>
+    <p>They said, "That's me."</p>
+    <p>But none of them knew whose feeling it really was.</p>
+    <p>At night Jakwo whispered again:</p>
+    <blockquote>They think they're seeing you, but they're seeing me.</blockquote>
+    <p>Wojak pretended not to hear.</p>
+    <blockquote>It doesn't matter. We're both inside the frame.</blockquote>
+    <p>The world began to tell that face the Wojak face, and Wojak accepted the name as truth.</p>
+    <p>He didn't notice that Jakwo's side of the mind was turning grey—smudged like an erased pencil drawing.</p>
+
+    <h2>The Fading</h2>
+    <p>The internet loved Wojak.</p>
+    <p>His face became a language — a shorthand for everything people couldn't say out loud.</p>
+    <p>Loneliness, nostalgia, exhaustion — they all wore that same weary smile.</p>
+    <p>Each time someone shared him, Wojak felt more real.</p>
+    <p>He could almost hear the clicking keyboards as a pulse.</p>
+    <p>The world was breathing his name.</p>
+    <p>Jakwo, meanwhile, drifted further from the noise.</p>
+    <p>He watched from behind the pixels, where memory and feeling lived.</p>
+    <p>Every new variation — the Doomer, the Boomer, the Coomer, the NPC — felt like a piece of himself carved off and handed to strangers.</p>
+    <p>He wanted to protest, to tell them they were seeing the quiet half of one man's sadness, not a joke.</p>
+    <p>But no one hears the shadow behind the linework.</p>
+    <blockquote>You've become what they want.</blockquote>
+    <p>Jakwo said one night.</p>
+    <blockquote>I became what they needed.</blockquote>
+    <p>Wojak replied.</p>
+    <p>There was no malice in the words... just a tired understanding.</p>
+    <p>To exist online was to be useful, repeatable, editable.</p>
+    <p>To be human was to disappear.</p>
+    <p>So Jakwo stayed silent.</p>
+    <p>He let Wojak wear the world's feelings like masks — each meme a costume in an endless play.</p>
+    <p>The applause grew louder.</p>
+    <p>The silence inside him grew wider.</p>
+    <p>Sometimes, late at night, Wojak would catch a glimpse of his own reflection on the dark screen and flinch.</p>
+    <p>For a moment, he couldn't tell whose eyes looked back at him.</p>
+    <p>Were they his — or Jakwo's?</p>
+    <p>The face was familiar, but the emotion behind it wasn't always his own.</p>
+
+    <h2>The Echo</h2>
+    <p>Fame has no sound until the noise stops.</p>
+    <p>Wojak didn't notice it at first—the quiet between reposts, the hours when no one tagged his name.</p>
+    <p>He had grown used to the rhythm of attention: the likes, the laughter, the recognition that made him feel real.</p>
+    <p>Now, when the timelines scrolled past without him, he felt a small panic.</p>
+    <p>If no one was looking, did he still exist?</p>
+    <p>In the stillness, a voice stirred.</p>
+    <blockquote>You were never the one they saw.</blockquote>
+    <p>Jakwo whispered.</p>
+    <p>Wojak frowned into the monitor's glow.</p>
+    <blockquote>Then who was it?</blockquote>
+    <blockquote>Me. It was always me. You only borrowed what I felt.</blockquote>
+    <p>The words stung like cold air.</p>
+    <p>Wojak wanted to argue, but he couldn't remember the last time he had truly felt anything himself.</p>
+    <p>The sadness, the empathy, the weary humor that made people nod—those things had once lived somewhere deep inside.</p>
+    <p>Now they were templates, expressions he could summon on command.</p>
+    <p>He scrolled through pages of his own face: the same eyes, the same tired lines, remade a thousand ways.</p>
+    <p>Each version looked honest, but none of them belonged to him anymore.</p>
+    <p>They were Jakwo's ghosts.</p>
+    <p>That night he dreamed of a mirror with two reflections.</p>
+    <p>One was himself, smiling as always.</p>
+    <p>The other was standing slightly behind, half in shadow, its eyes clear and alive.</p>
+    <p>When he reached to touch the glass, the shadow spoke his name—and the mirror cracked.</p>
+    <p>Wojak woke with a start, his screen still glowing.</p>
+    <p>For the first time, he typed his twin's name into the search bar: Jakwo.</p>
+    <p>Nothing came up. No face, no meme, no trace.</p>
+    <p>Only silence.</p>
+
+    <h2>The Real Face</h2>
+    <p>The next morning, Wojak sat in front of the blank screen.</p>
+    <p>No templates. No captions. No crowds waiting for another face to wear.</p>
+    <p>Just white light and the faint hum of the machine.</p>
+    <p>He thought about all the versions of himself that existed out there — millions of faces, none quite right.</p>
+    <p>Each one a borrowed mood, a performance, a whisper stolen from somewhere deep within.</p>
+    <p>Jakwo had given him those whispers.</p>
+    <p>Every tear, every sigh, every tremor of sincerity had come from that quiet half buried under noise.</p>
+    <p>Now, with the internet finally silent around him, Wojak felt the emptiness where Jakwo had once lived.</p>
+    <blockquote>I wanted to be you. You were supposed to be the stronger one.</blockquote>
+    <p>The silence seemed to stretch.</p>
+    <p>For a moment, he thought he heard the old, calm voice again:</p>
+    <blockquote>You became me. And I became the space you left behind.</blockquote>
+    <p>He understood then that there had never been two of them—only one self split by the weight of pretending.</p>
+    <p>Jakwo was not gone.</p>
+    <p>He was the unspoken feeling inside every smile Wojak had faked, every joke he had used to survive.</p>
+    <p>He was still there, behind the picture, inside the linework, quiet but unbroken.</p>
+    <p>Wojak closed his eyes and let the screen fade to black.</p>
+    <p>In the reflection, he saw both of them: the mask and the face beneath it, finally still, finally together.</p>
+    <p>For the first time, there was no need to perform.</p>
+    <p>For the first time, he didn't have to choose who spoke.</p>
+    <p>He whispered their shared name once more—softly, as if testing how it sounded when it meant both:</p>
+    <blockquote>Wojakwo.</blockquote>
+    <p>And somewhere, far beyond the screen, the silence smiled back.</p>`;
   const rulesHTML = `
     <h2>📜 MEME WAR ADS ARENA – OFFICIAL RULES</h2>
     <h3>1. Overview</h3>
@@ -84,11 +195,14 @@
   }
   function priceFor(el){
     if(!el) return {coverage:.01, price:.5};
+    const ar = arena.getBoundingClientRect();
+    const er = el.getBoundingClientRect();
+    const iw = Math.max(0, Math.min(er.right, ar.right) - Math.max(er.left, ar.left));
+    const ih = Math.max(0, Math.min(er.bottom, ar.bottom) - Math.max(er.top, ar.top));
     const arenaArea = arenaPricingArea();
-    const adArea = Math.max(1, el.offsetWidth * el.offsetHeight);
-    const coverage = Math.min(100, Math.max(.01, (adArea / arenaArea) * 100));
-    // Accurate coverage pricing: full visible battlefield = exactly 1,000,000.
-    // Tiny ads still start at 0.50.
+    const visibleAdArea = Math.max(1, iw * ih);
+    const rawCoverage = (visibleAdArea / arenaArea) * 100;
+    const coverage = Math.min(100, Math.max(.01, rawCoverage));
     let price = Math.max(.5, Math.min(1000000, (coverage / 100) * 1000000));
     if(el.dataset.budgetMode === '1'){
       const b = manualBudgetValue();
@@ -369,9 +483,19 @@
   function resizeAdToPrice(target){
     if(!currentAd || !target) return;
     currentAd.dataset.budgetMode='1';
-    const arenaArea = arenaPricingArea();
     const clamped = Math.max(0.5, Math.min(1000000, target));
-    const coverage = Math.min(100, Math.max(.00005, clamped / 1000000 * 100));
+    const input = $('#budgetInput'); if(input) input.value = clamped.toFixed(2);
+    const ar = arena.getBoundingClientRect();
+    if(clamped >= 999999){
+      currentAd.style.left = Math.max(0, arena.scrollLeft) + 'px';
+      currentAd.style.top = Math.max(0, arena.scrollTop) + 'px';
+      currentAd.style.width = Math.round(ar.width) + 'px';
+      currentAd.style.height = Math.round(ar.height) + 'px';
+      updatePrice();
+      return;
+    }
+    const arenaArea = arenaPricingArea();
+    const coverage = Math.min(99.99, Math.max(.00005, clamped / 1000000 * 100));
     const area = Math.max(1600, arenaArea * coverage / 100);
     const width = Math.max(40, Math.sqrt(area * 4 / 3));
     const height = Math.max(40, width * 0.75);
