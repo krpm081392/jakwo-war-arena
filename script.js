@@ -547,7 +547,7 @@
     const rec = adRecordFromElement(el, amount);
     el.dataset.id = rec.id;
 
-    // Always keep local backup first. Even if Supabase fails, refresh on same device keeps the paid ad.
+    // Keep local emergency backup only until Supabase confirms the save.
     const rows = getLocalAds().filter(a => a.id !== rec.id);
     rows.push(rec);
     setLocalAds(rows);
@@ -579,27 +579,41 @@
         }
         if(saved){
           console.log('SUPABASE AD SAVED');
+          // Supabase is the source of truth for all devices. Clear local emergency duplicate.
+          setLocalAds(getLocalAds().filter(a => a.id !== rec.id));
+          return true;
         } else {
           console.error('Supabase ad save failed after retries:', lastError);
+          return false;
         }
       }catch(e){
         console.warn('Supabase ad save failed, local save still kept:', e);
+        return false;
       }
     }
+    return false;
   }
 
+  let loadAdsBusy = false;
+  let lastAdsJson = '';
   async function loadDeployedAds(){
+    if(loadAdsBusy) return;
+    loadAdsBusy = true;
     let rows = [];
+    let loadedFromSupabase = false;
     if(supa){
       try{
-        const { data, error } = await supa.from('ads').select('*').order('created_at', { ascending:true }).limit(500);
-        if(!error && Array.isArray(data)) rows = data;
-      }catch(e){ console.warn('Supabase ad load failed:', e); }
+        const { data, error } = await supa.from('ads').select('*').order('created_at', { ascending:true }).limit(1000);
+        if(error) throw error;
+        if(Array.isArray(data)){ rows = data; loadedFromSupabase = true; }
+      }catch(e){ console.warn('Supabase ad load failed, using local fallback:', e); }
     }
 
-    // Merge local paid/deployed backups with Supabase rows. This prevents a paid ad from disappearing
-    // after refresh if Supabase insert failed or schema still needs updating.
-    const localRows = getLocalAds();
+    // Supabase is the source of truth across devices. Local is only an offline fallback.
+    if(!loadedFromSupabase){
+      rows = getLocalAds();
+    }
+
     const adKey = (r) => String(r.id || r.tx_signature || ((r.image_url||'') + '|' + (r.name||'') + '|' + (r.amount||'')));
     const dedupedRows = [];
     const seen = new Set();
@@ -607,17 +621,18 @@
       const key = adKey(r);
       if(key && !seen.has(key)){ dedupedRows.push(r); seen.add(key); }
     }
-    for(const r of localRows){
-      const key = adKey(r);
-      if(key && !seen.has(key)){ dedupedRows.push(r); seen.add(key); }
-    }
     rows = dedupedRows;
 
-    arena.querySelectorAll('.ad.locked').forEach(n => n.remove());
-    rows.forEach(renderDeployedAd);
+    const json = JSON.stringify(rows.map(r => [r.id, r.tx_signature, r.created_at, r.x, r.y, r.w, r.h, r.x_percent, r.y_percent, r.w_percent, r.h_percent, r.amount, r.name]));
+    if(json !== lastAdsJson){
+      arena.querySelectorAll('.ad.locked').forEach(n => n.remove());
+      rows.forEach(renderDeployedAd);
+      lastAdsJson = json;
+    }
 
     window.__JAKWO_ROWS = rows;
     refreshStatsFromRows(rows);
+    loadAdsBusy = false;
   }
 
   function makeInteractive(el){
@@ -1030,7 +1045,10 @@
     await saveDeployedAd(deployedAd, voucher ? 0 : p.price);
     console.log('AD SAVE STEP FINISHED');
     $('#voucherCode').value = '';
-    announce(name, voucher ? 0 : p.price); impact(voucher ? 0 : p.price); await loadDeployedAds(); closeSheet(); currentAd=null; updatePrice();
+    announce(name, voucher ? 0 : p.price); impact(voucher ? 0 : p.price);
+    await loadDeployedAds();
+    setTimeout(loadDeployedAds, 1200);
+    closeSheet(); currentAd=null; updatePrice();
     $('#deployBtn').disabled = false;
     $('#deployBtn').textContent = 'DEPLOY TO WAR';
     alert(paymentSignature ? 'Payment confirmed. Ad deployed and locked forever.' : 'Voucher accepted. Ad deployed and locked forever.');
@@ -1103,19 +1121,29 @@
 
 
 
+  let realtimePoll = null;
   function setupAdsRealtime(){
-    if(!supa) return;
-    try{
-      if(adsChannel) supa.removeChannel(adsChannel);
-      adsChannel = supa.channel('jakwo-war-ads-live')
-        .on('postgres_changes', { event:'*', schema:'public', table:'ads' }, async () => {
-          await loadDeployedAds();
-        })
-        .subscribe((status)=>{
-          console.log('ADS REALTIME:', status);
-          if(status === 'SUBSCRIBED') loadDeployedAds();
-        });
-    }catch(e){ console.warn('Supabase ads realtime failed:', e); }
+    const reloadAll = () => { loadDeployedAds(); };
+    if(supa){
+      try{
+        if(adsChannel) supa.removeChannel(adsChannel);
+        adsChannel = supa.channel('jakwo-war-ads-live')
+          .on('postgres_changes', { event:'INSERT', schema:'public', table:'ads' }, reloadAll)
+          .on('postgres_changes', { event:'UPDATE', schema:'public', table:'ads' }, reloadAll)
+          .on('postgres_changes', { event:'DELETE', schema:'public', table:'ads' }, reloadAll)
+          .subscribe((status)=>{
+            console.log('ADS REALTIME:', status);
+            if(status === 'SUBSCRIBED') reloadAll();
+          });
+      }catch(e){ console.warn('Supabase ads realtime failed:', e); }
+    }
+    // Fallback: if Supabase Realtime is not enabled for ads, this still updates other devices without refresh.
+    if(realtimePoll) clearInterval(realtimePoll);
+    realtimePoll = setInterval(()=>{
+      if(document.visibilityState !== 'hidden') loadDeployedAds();
+    }, 3000);
+    window.addEventListener('focus', loadDeployedAds);
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState !== 'hidden') loadDeployedAds(); });
   }
 
   function initMobileStageZoom(){
