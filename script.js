@@ -218,37 +218,62 @@
     const r = arena.getBoundingClientRect();
     return Math.max(1, r.width * r.height);
   }
+  function minAdArea(){
+    // The smallest visible ad on screen is the 0.50 USDC floor.
+    // This prevents a 40x40 image from being priced like thousands of USDC.
+    return 40 * 40;
+  }
+  function priceFromArea(visibleAdArea){
+    const arenaArea = arenaPricingArea();
+    const minArea = Math.min(minAdArea(), arenaArea);
+    const clampedArea = Math.max(minArea, Math.min(arenaArea, visibleAdArea));
+    if(arenaArea <= minArea) return 0.5;
+    const ratio = (clampedArea - minArea) / (arenaArea - minArea);
+    return Math.max(0.5, Math.min(1000000, 0.5 + ratio * (1000000 - 0.5)));
+  }
+  function areaFromPrice(price){
+    const arenaArea = arenaPricingArea();
+    const minArea = Math.min(minAdArea(), arenaArea);
+    const p = Math.max(0.5, Math.min(1000000, Number(price) || 0.5));
+    if(p >= 999999.99) return arenaArea;
+    const ratio = (p - 0.5) / (1000000 - 0.5);
+    return Math.max(minArea, Math.min(arenaArea, minArea + ratio * (arenaArea - minArea)));
+  }
   function priceFor(el){
-    if(!el) return {coverage:.01, price:.5};
+    if(!el) return {coverage:.00005, price:.5};
     const ar = arena.getBoundingClientRect();
     const er = el.getBoundingClientRect();
     const iw = Math.max(0, Math.min(er.right, ar.right) - Math.max(er.left, ar.left));
     const ih = Math.max(0, Math.min(er.bottom, ar.bottom) - Math.max(er.top, ar.top));
     const arenaArea = arenaPricingArea();
     const visibleAdArea = Math.max(1, iw * ih);
-    const rawCoverage = (visibleAdArea / arenaArea) * 100;
-    let coverage = Math.min(100, Math.max(.00005, rawCoverage));
-    let price = Math.max(.5, Math.min(1000000, (coverage / 100) * 1000000));
-    if(el.dataset.budgetMode === '1'){
-      const b = manualBudgetValue();
-      if(b){
-        price = b;
-        coverage = Math.min(100, Math.max(.00005, (b / 1000000) * 100));
-      }
-    }
+    let coverage = Math.min(100, Math.max(.00005, (visibleAdArea / arenaArea) * 100));
+    let price = priceFromArea(visibleAdArea);
     return {coverage, price};
   }
   function activeVoucherValue(){
     const input = $('#voucherCode');
     return input ? voucherValue(input.value) : 0;
   }
+  function formatBudgetValue(v){
+    const n = Math.max(0.5, Math.min(1000000, Number(v) || 0.5));
+    if(n >= 1000000) return '1000000';
+    if(n < 1) return n.toFixed(2);
+    if(Number.isInteger(n)) return String(n);
+    return n.toFixed(2).replace(/\.00$/,'').replace(/(\.\d*?)0+$/,'$1');
+  }
   function updatePrice(){
-    const p = currentAd ? priceFor(currentAd) : {coverage:.1, price:.5};
+    const p = currentAd ? priceFor(currentAd) : {coverage:.00005, price:.5};
     const vv = currentAd ? activeVoucherValue() : 0;
     const displayPrice = Math.max(0.5, Math.min(1000000, vv || p.price || 0.5));
     $('#costText').textContent = `${displayPrice.toFixed(2)} USDC`;
     $('#coverageText').textContent = `${p.coverage < 0.01 ? p.coverage.toFixed(5) : p.coverage.toFixed(2)}%`;
     $('#sheetPrice').textContent = `${displayPrice.toFixed(2)} USDC`;
+    const bi = $('#budgetInput');
+    if(currentAd && bi && document.activeElement !== bi){
+      // When user drags/resizes the ad, keep the budget/price input synced.
+      bi.value = formatBudgetValue(displayPrice);
+    }
   }
   function openSheet(){
     if(sheet.classList.contains('open')){ closeSheet(); return; }
@@ -467,7 +492,7 @@
       if(t.classList.contains('x')){ el.remove(); currentAd=null; updatePrice(); return; }
       const p = e.touches ? e.touches[0] : e;
       sx=p.clientX; sy=p.clientY; sl=parseFloat(el.style.left)||0; st=parseFloat(el.style.top)||0; sw=el.offsetWidth; sh=el.offsetHeight;
-      resizing = t.classList.contains('resize'); dragging = !resizing; if(resizing) el.dataset.budgetMode='0'; el.setPointerCapture?.(e.pointerId||0);
+      resizing = t.classList.contains('resize'); dragging = !resizing; el.dataset.budgetMode='0'; el.setPointerCapture?.(e.pointerId||0);
     };
     const move = (e) => {
       if(el.classList.contains('locked')) return;
@@ -544,11 +569,11 @@
   }
   function resizeAdToPrice(target, updateInput=false){
     if(!currentAd || !target) return;
-    currentAd.dataset.budgetMode='1';
-    const clamped = Math.max(0.5, Math.min(1000000, target));
-    const input = $('#budgetInput'); if(input && updateInput) input.value = String(clamped);
+    const clamped = Math.max(0.5, Math.min(1000000, Number(target) || 0.5));
+    const input = $('#budgetInput'); if(input && updateInput) input.value = formatBudgetValue(clamped);
     const ar = arena.getBoundingClientRect();
-    if(clamped >= 999999){
+    if(clamped >= 999999.99){
+      // 1M = exactly the whole visible arena field.
       currentAd.style.left = Math.max(0, arena.scrollLeft) + 'px';
       currentAd.style.top = Math.max(0, arena.scrollTop) + 'px';
       currentAd.style.width = Math.round(arena.clientWidth || ar.width) + 'px';
@@ -556,9 +581,7 @@
       updatePrice();
       return;
     }
-    const arenaArea = arenaPricingArea();
-    const coverage = Math.min(99.99, Math.max(.00005, clamped / 1000000 * 100));
-    const area = Math.max(1600, arenaArea * coverage / 100);
+    const area = areaFromPrice(clamped);
     const width = Math.max(40, Math.sqrt(area * 4 / 3));
     const height = Math.max(40, width * 0.75);
     currentAd.style.width = Math.round(width) + 'px';
@@ -746,8 +769,8 @@
   const applyBudget = () => {
     if(!budgetEl) return;
     const raw = budgetEl.value;
-    // Let user erase and type freely. Do not force .00.
-    if(raw.trim() === ''){ if(currentAd){ currentAd.dataset.budgetMode='0'; updatePrice(); } return; }
+    // Free text input: user can erase .00, type 1m, 1000, 0.50, etc.
+    if(raw.trim() === ''){ updatePrice(); return; }
     let v = parseMoneyValue(raw);
     if(Number.isFinite(v) && v >= 0.5){
       v = Math.max(0.5, Math.min(1000000, v));
