@@ -484,16 +484,46 @@
   async function saveDeployedAd(el, amount){
     const rec = adRecordFromElement(el, amount);
     el.dataset.id = rec.id;
+
+    // Always keep a local backup first so refresh on the same device never loses the ad.
     const rows = getLocalAds().filter(a => a.id !== rec.id);
     rows.push(rec);
     setLocalAds(rows);
+
     if(supa){
       try{
-        const dbRec = { image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, x: rec.x, y: rec.y, w: rec.w, h: rec.h, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent, name: rec.name, locked: true, voucher_code: cleanVoucher($('#voucherCode')?.value || '') || null, tx_signature: el.dataset.tx || null };
-        const oldId = rec.id;
-        const { data, error } = await supa.from('ads').insert(dbRec).select('id').single();
-        if(!error && data?.id){ rec.id = data.id; el.dataset.id = data.id; const updated = getLocalAds().filter(a => a.id !== oldId && a.id !== data.id); updated.push({...rec, id:data.id}); setLocalAds(updated); }
-      }catch(e){ console.warn('Supabase ad save failed, local save still kept:', e); }
+        const voucherCode = cleanVoucher($('#voucherCode')?.value || '') || null;
+        const baseRec = {
+          image_url: rec.image_url,
+          link: rec.link,
+          wallet: rec.wallet,
+          amount: rec.amount,
+          x: rec.x, y: rec.y, w: rec.w, h: rec.h,
+          name: rec.name,
+          locked: true,
+          voucher_code: voucherCode,
+          tx_signature: el.dataset.tx || null
+        };
+
+        // Try the newer percent-position columns first.
+        let dbRec = { ...baseRec, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent };
+        let { error } = await supa.from('ads').insert(dbRec);
+
+        // If user's Supabase table has not been upgraded yet, fall back to old columns only.
+        if(error){
+          console.warn('Supabase ad save with percent columns failed, retrying legacy columns:', error);
+          ({ error } = await supa.from('ads').insert(baseRec));
+        }
+
+        if(error){
+          console.error('Supabase ad save failed:', error);
+          throw error;
+        }
+
+        console.log('SUPABASE AD SAVED');
+      }catch(e){
+        console.warn('Supabase ad save failed, local save still kept:', e);
+      }
     }
   }
   async function loadDeployedAds(){
