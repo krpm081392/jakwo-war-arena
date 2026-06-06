@@ -186,6 +186,26 @@
   function announce(name, price){
     $('#tickerText').textContent = `🚨 ${name} launched a new war ad for ${price.toFixed(2)} USDC • Buy. Place. Block. Repeat. • New ads can cover old ads •`;
   }
+  function compressImageFile(file, cb){
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 900;
+        let w = img.width, h = img.height;
+        if(Math.max(w,h) > max){ const s = max / Math.max(w,h); w = Math.round(w*s); h = Math.round(h*s); }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        cb(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => cb(reader.result);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function addAd(src){
     const ad = document.createElement('div');
     ad.className = 'ad editing';
@@ -261,7 +281,19 @@
     }
     if(!rows.length) rows = getLocalAds();
     rows.forEach(renderDeployedAd);
-    if(rows.length){ stats.total = Math.max(Number(stats.total)||0, rows.length); saveStats(); renderStats(); }
+    if(rows.length){
+      const paidVolume = rows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+      const latest = rows[rows.length - 1];
+      const byWallet = {};
+      rows.forEach(r => { const w = r.wallet || r.name || 'None'; byWallet[w] = (byWallet[w] || 0) + Number(r.amount || 0); });
+      const topWallet = Object.entries(byWallet).sort((a,b)=>b[1]-a[1])[0];
+      stats.total = rows.length;
+      stats.volume = paidVolume;
+      stats.latest = latest?.name || 'Your Ad';
+      stats.top = topWallet ? shortWallet(topWallet[0]) : 'None';
+      saveStats();
+      renderStats();
+    }
   }
 
   function makeInteractive(el){
@@ -363,6 +395,7 @@
   }
 
   async function payUsdc(amount){
+    amount = Math.max(0.5, Number(amount || 0.5));
     const provider = window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null);
     if(!provider || !provider.publicKey){
       alert('Wallet connected but Phantom provider is not ready. Open in Phantom browser and reconnect.');
@@ -511,14 +544,14 @@
   }
 
   $('#connectBtn').onclick = connect;
-  $('#addBtn').onclick = openSheet; $('#mobileAddBtn').onclick = openSheet; $('#closeSheet').onclick = closeSheet;
+  $('#addBtn').onclick = openSheet; $('#mobileAddBtn').onclick = openSheet; $('#desktopAddBtn') && ($('#desktopAddBtn').onclick = openSheet); $('#closeSheet').onclick = closeSheet;
   $('#closePanel').onclick = closePanel;
   $('#deployBtn').onclick = deploy;
   $('#budgetInput')?.addEventListener('change', e => { let v = Number(e.target.value); if(!Number.isFinite(v) || v < 0.5) v = 0.5; e.target.value = v.toFixed(2); resizeAdToPrice(v); });
   $('#budgetInput')?.addEventListener('input', e => { const v = Number(e.target.value); if(v >= 0.5) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('change', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('input', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
-  $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };
+  $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; compressImageFile(file, addAd); };
   $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
   $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));
 

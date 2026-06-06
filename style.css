@@ -170,3 +170,37 @@
 .top-w1{left:145px;top:6px;transform:rotate(-8deg) scale(.55)}.top-w2{left:235px;top:4px;transform:rotate(5deg) scale(.55)}.top-w3{left:325px;top:7px;transform:rotate(-4deg) scale(.55)}.top-w4{left:420px;top:5px;transform:rotate(6deg) scale(.55)}.top-w5{left:520px;top:7px;transform:rotate(-5deg) scale(.55)}.top-w6{right:300px;top:5px;transform:rotate(7deg) scale(.55)}.top-w7{right:195px;top:6px;transform:rotate(-6deg) scale(.55)}.top-w8{right:95px;top:5px;transform:rotate(5deg) scale(.55)}
 .side-w1{left:22px;top:225px;transform:rotate(-7deg) scale(.72)}.side-w2{left:30px;top:330px;transform:rotate(6deg) scale(.72)}.side-w3{left:20px;top:438px;transform:rotate(-5deg) scale(.72)}.side-w4{left:32px;top:545px;transform:rotate(7deg) scale(.72)}.side-w5{left:18px;top:652px;transform:rotate(-8deg) scale(.72)}.side-w6{left:34px;top:758px;transform:rotate(5deg) scale(.72)}.side-w7{left:20px;top:865px;transform:rotate(-4deg) scale(.72)}.side-w8{left:32px;top:972px;transform:rotate(6deg) scale(.72)}
 @media(max-width:800px){.top-deco-layer,.side-deco-layer{display:none}}
+
+
+/* DESKTOP-ONLY UI PATCH: keep mobile unchanged, make PC cleaner/wider like latest working screenshot */
+.desktop-dock{display:none;}
+@media (min-width:801px){
+  body{background:#2b1508;}
+  .topbar{height:42px;padding:4px 18px;background:linear-gradient(180deg,#3b1b0c,#211006);}
+  .brand span{font-size:24px;line-height:.8}.brand small{font-size:9px;letter-spacing:.8px}
+  .wallet,.square{padding:7px 13px;min-width:38px;border-radius:6px;font-size:13px;}
+  .ticker-wrap{top:42px;height:24px;background:#e3c075;}
+  .ticker-wrap b{font-size:12px;padding:0 16px;}
+  .ticker{font-size:13px;}
+  .stats{top:66px;height:42px;padding:5px 12px;gap:8px;background:#2b1308;}
+  .stats div{border-radius:5px;background:#f5df9d;justify-content:flex-start;padding-left:18px;}
+  .stats strong{font-size:18px}.stats span{font-size:10px;}
+  .app{top:108px;grid-template-columns:1fr;background:#2b1508;}
+  .sidebar{display:none!important;}
+  .arena{margin:7px;border:4px solid #4a210c;border-radius:5px;min-height:calc(100vh - 122px);background:
+    radial-gradient(circle at 78% 18%,rgba(95,38,12,.18),transparent 28%),
+    linear-gradient(90deg,rgba(80,36,10,.10) 1px,transparent 1px) 0 0/18px 18px,
+    linear-gradient(0deg,rgba(80,36,10,.08) 1px,transparent 1px) 0 0/18px 18px,
+    linear-gradient(120deg,#edc46f,#d79d4f 55%,#c7883f);
+    box-shadow:inset 0 0 70px rgba(64,26,5,.38),0 0 0 2px rgba(255,227,143,.25);
+  }
+  .cost-badge{right:18px;bottom:82px;padding:8px 11px;border-radius:8px;}
+  .cost-badge b{font-size:15px;}
+  .add-btn{display:none!important;}
+  .desktop-dock{display:flex;align-items:center;gap:8px;position:fixed;right:18px;bottom:12px;z-index:70;}
+  .desktop-dock button{height:48px;border:3px solid #5a2a12;background:linear-gradient(180deg,#f6dc9b,#d59e4d);color:#2a1206;border-radius:7px;font-weight:1000;padding:0 18px;box-shadow:0 4px 0 #2a1206;cursor:pointer;}
+  .desktop-dock #desktopAddBtn{background:linear-gradient(180deg,#d63c2f,#951b14);color:#fff;border-color:#f0c47a;font-size:16px;min-width:190px;}
+  .panel{top:116px!important;left:16px!important;width:380px!important;bottom:72px!important;background:#fff0bf!important;border-color:#542810!important;color:#2c1609!important;}
+  .sheet.open{bottom:72px!important;}
+  .top-deco-layer,.side-deco-layer{display:none!important;}
+}
