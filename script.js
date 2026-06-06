@@ -8,9 +8,11 @@
   const config = window.JAKWO_CONFIG || {};
   let wallet = localStorage.getItem('jakwo_wallet') || '';
   let currentAd = null;
-  let stats = JSON.parse(localStorage.getItem('jakwo_stats') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
+  let stats = JSON.parse(localStorage.getItem('jakwo_stats_v3_fresh') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
   let chatChannel = null;
-  const ADS_KEY = 'jakwo_deployed_ads_v1';
+  const ADS_KEY = 'jakwo_deployed_ads_v3_fresh';
+  const CHAT_KEY = 'jakwo_chat_v3_fresh';
+  const STATS_KEY = 'jakwo_stats_v3_fresh';
   const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0 || ('ontouchstart' in window);
   const esc = (v) => String(v || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const supa = (() => {
@@ -21,6 +23,19 @@
     } catch(_e) {}
     return null;
   })();
+
+
+  if(new URLSearchParams(location.search).get('reset') === '1'){
+    try{
+      localStorage.removeItem(ADS_KEY);
+      localStorage.removeItem(CHAT_KEY);
+      localStorage.removeItem(STATS_KEY);
+      localStorage.removeItem('jakwo_used_vouchers');
+      localStorage.removeItem('jakwo_stats');
+      localStorage.removeItem('jakwo_deployed_ads_v1');
+      localStorage.removeItem('jakwo_chat');
+    }catch(_e){}
+  }
 
   const storyHTML = `
     <h2>Jakwo and Wojak Story</h2>
@@ -175,7 +190,7 @@
       el.placeholder = wallet ? 'Type message...' : 'Connect wallet to chat';
     });
   }
-  function saveStats(){ localStorage.setItem('jakwo_stats', JSON.stringify(stats)); }
+  function saveStats(){ localStorage.setItem(STATS_KEY, JSON.stringify(stats)); }
   function renderStats(){
     $('#totalAds').textContent = stats.total;
     $('#arenaVolume').textContent = Number(stats.volume).toFixed(2);
@@ -212,11 +227,14 @@
     const arenaArea = arenaPricingArea();
     const visibleAdArea = Math.max(1, iw * ih);
     const rawCoverage = (visibleAdArea / arenaArea) * 100;
-    const coverage = Math.min(100, Math.max(.01, rawCoverage));
+    let coverage = Math.min(100, Math.max(.00005, rawCoverage));
     let price = Math.max(.5, Math.min(1000000, (coverage / 100) * 1000000));
     if(el.dataset.budgetMode === '1'){
       const b = manualBudgetValue();
-      if(b) price = b;
+      if(b){
+        price = b;
+        coverage = Math.min(100, Math.max(.00005, (b / 1000000) * 100));
+      }
     }
     return {coverage, price};
   }
@@ -229,7 +247,7 @@
     const vv = currentAd ? activeVoucherValue() : 0;
     const displayPrice = Math.max(0.5, Math.min(1000000, vv || p.price || 0.5));
     $('#costText').textContent = `${displayPrice.toFixed(2)} USDC`;
-    $('#coverageText').textContent = `${p.coverage.toFixed(2)}%`;
+    $('#coverageText').textContent = `${p.coverage < 0.01 ? p.coverage.toFixed(5) : p.coverage.toFixed(2)}%`;
     $('#sheetPrice').textContent = `${displayPrice.toFixed(2)} USDC`;
   }
   function openSheet(){
@@ -255,7 +273,7 @@
       const input = panel.querySelector('#chatInput');
       const send = panel.querySelector('#chatSend');
       const messages = panel.querySelector('#chatMessages');
-      const localChatRows = () => { try { return JSON.parse(localStorage.getItem('jakwo_chat') || '[]'); } catch(_e){ return []; } };
+      const localChatRows = () => { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch(_e){ return []; } };
       const normalizeChat = (r) => ({ wallet: r.wallet || 'Anon', text: r.message || r.text || '', at: r.created_at || r.at || '' });
       const drawRows = (rows) => {
         messages.innerHTML = rows.length ? rows.map(r => `<p><b>${esc(r.wallet)}</b>: ${esc(r.text)}</p>`).join('') : '<p><b>System:</b> Connect wallet to join the war chat.</p>';
@@ -285,10 +303,10 @@
             if(error) throw error;
           }catch(e){
             console.warn('Supabase chat send failed, saving local fallback:', e);
-            const rows = localChatRows(); rows.push(row); localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-80)));
+            const rows = localChatRows(); rows.push(row); localStorage.setItem(CHAT_KEY, JSON.stringify(rows.slice(-80)));
           }
         } else {
-          const rows = localChatRows(); rows.push(row); localStorage.setItem('jakwo_chat', JSON.stringify(rows.slice(-80)));
+          const rows = localChatRows(); rows.push(row); localStorage.setItem(CHAT_KEY, JSON.stringify(rows.slice(-80)));
         }
         input.value = '';
         await renderChat();
@@ -311,9 +329,43 @@
     }
   }
   function closePanel(){ panel.classList.add('hidden'); }
-  function impact(){
-    document.body.classList.add('shake'); $('#impactFlash').classList.add('flash');
-    setTimeout(()=>{document.body.classList.remove('shake'); $('#impactFlash').classList.remove('flash')}, 600);
+  function impact(amount=0){
+    const flash = $('#impactFlash');
+    let alertBox = $('#warAlert');
+    if(!alertBox){
+      alertBox = document.createElement('div');
+      alertBox.id = 'warAlert';
+      document.body.appendChild(alertBox);
+    }
+    const a = Number(amount || 0);
+    let text = '⚔ NEW WAR AD DEPLOYED';
+    let dur = 750;
+    if(a >= 1000000){ text = '🚨 TSUNAMI ALERT — ARENA DOMINATOR DEPLOYED'; dur = 1800; }
+    else if(a >= 10000){ text = '🚨 MAJOR WAR IMPACT'; dur = 1300; }
+    else if(a >= 1000){ text = '⚠ WAR IMPACT DETECTED'; dur = 1000; }
+    document.body.classList.add(a >= 1000000 ? 'mega-shake' : 'shake');
+    flash.classList.add(a >= 1000000 ? 'mega-flash' : 'flash');
+    alertBox.textContent = text;
+    alertBox.classList.add('show');
+    try{ if(navigator.vibrate) navigator.vibrate(a >= 1000000 ? [250,120,250,120,400] : [90,60,90]); }catch(_e){}
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC){
+        const ctx = new AC();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.value = a >= 1000000 ? 180 : 320;
+        gain.gain.value = 0.035;
+        osc.connect(gain); gain.connect(ctx.destination); osc.start();
+        setTimeout(()=>{ try{osc.stop(); ctx.close();}catch(_e){} }, a >= 1000000 ? 450 : 180);
+      }
+    }catch(_e){}
+    setTimeout(()=>{
+      document.body.classList.remove('shake','mega-shake');
+      flash.classList.remove('flash','mega-flash');
+      alertBox.classList.remove('show');
+    }, dur);
   }
   function announce(name, price){
     $('#tickerText').textContent = `🚨 ${name} launched a new war ad for ${price.toFixed(2)} USDC • Buy. Place. Block. Repeat. • New ads can cover old ads •`;
@@ -490,17 +542,17 @@
     if(m[1] === '050') return 0.5;
     return Number(m[1]);
   }
-  function resizeAdToPrice(target){
+  function resizeAdToPrice(target, updateInput=false){
     if(!currentAd || !target) return;
     currentAd.dataset.budgetMode='1';
     const clamped = Math.max(0.5, Math.min(1000000, target));
-    const input = $('#budgetInput'); if(input) input.value = clamped.toFixed(2);
+    const input = $('#budgetInput'); if(input && updateInput) input.value = String(clamped);
     const ar = arena.getBoundingClientRect();
     if(clamped >= 999999){
       currentAd.style.left = Math.max(0, arena.scrollLeft) + 'px';
       currentAd.style.top = Math.max(0, arena.scrollTop) + 'px';
-      currentAd.style.width = Math.round(ar.width) + 'px';
-      currentAd.style.height = Math.round(ar.height) + 'px';
+      currentAd.style.width = Math.round(arena.clientWidth || ar.width) + 'px';
+      currentAd.style.height = Math.round(arena.clientHeight || ar.height) + 'px';
       updatePrice();
       return;
     }
@@ -610,7 +662,7 @@
     const voucher = cleanVoucher($('#voucherCode').value);
     const name = ($('#adName').value || 'Unnamed War Ad').trim().slice(0,40);
     const budgetInput = $('#budgetInput');
-    const budgetVal = budgetInput ? Number(budgetInput.value) : 0;
+    const budgetVal = budgetInput ? parseMoneyValue(budgetInput.value) : 0;
     if(budgetVal >= 0.5) resizeAdToPrice(budgetVal);
     let p = priceFor(currentAd);
 
@@ -680,7 +732,7 @@
     if(paymentSignature) deployedAd.dataset.tx = paymentSignature;
     await saveDeployedAd(deployedAd, voucher ? 0 : p.price);
     $('#voucherCode').value = '';
-    stats.total += 1; stats.volume += voucher ? 0 : Number(p.price || 0); stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name, voucher ? 0 : p.price); impact(); closeSheet(); currentAd=null; updatePrice();
+    stats.total += 1; stats.volume += voucher ? 0 : Number(p.price || 0); stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name, voucher ? 0 : p.price); impact(voucher ? 0 : p.price); closeSheet(); currentAd=null; updatePrice();
     $('#deployBtn').disabled = false;
     $('#deployBtn').textContent = 'DEPLOY TO WAR';
     alert(paymentSignature ? 'Payment confirmed. Ad deployed and locked forever.' : 'Voucher accepted. Ad deployed and locked forever.');
@@ -691,20 +743,21 @@
   $('#closePanel').onclick = closePanel;
   $('#deployBtn').onclick = deploy;
   const budgetEl = $('#budgetInput');
-  const applyBudget = (normalize=false) => {
+  const applyBudget = () => {
     if(!budgetEl) return;
-    let v = parseMoneyValue(budgetEl.value);
-    if(!Number.isFinite(v) || v < 0.5) v = normalize ? 0.5 : 0;
-    if(v){
+    const raw = budgetEl.value;
+    // Let user erase and type freely. Do not force .00.
+    if(raw.trim() === ''){ if(currentAd){ currentAd.dataset.budgetMode='0'; updatePrice(); } return; }
+    let v = parseMoneyValue(raw);
+    if(Number.isFinite(v) && v >= 0.5){
       v = Math.max(0.5, Math.min(1000000, v));
-      if(normalize) budgetEl.value = v.toFixed(2);
-      resizeAdToPrice(v);
+      resizeAdToPrice(v, false);
     }
   };
-  budgetEl?.addEventListener('input', () => applyBudget(false));
-  budgetEl?.addEventListener('keyup', () => applyBudget(false));
-  budgetEl?.addEventListener('change', () => applyBudget(true));
-  budgetEl?.addEventListener('blur', () => applyBudget(true));
+  budgetEl?.addEventListener('input', applyBudget);
+  budgetEl?.addEventListener('keyup', applyBudget);
+  budgetEl?.addEventListener('change', applyBudget);
+  budgetEl?.addEventListener('blur', applyBudget);
   $('#voucherCode').addEventListener('change', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('input', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };

@@ -363,3 +363,12 @@
 @media (max-width:800px){
   .add-btn{white-space:normal!important;}
 }
+
+/* PATCH: war impact alert + stronger 1M effect */
+#warAlert{position:fixed;left:50%;top:70px;transform:translateX(-50%) scale(.95);z-index:250;background:#9b160f;color:#fff6d8;border:3px solid #ffd27a;border-radius:10px;padding:12px 22px;font-weight:1000;letter-spacing:.7px;box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:.18s;white-space:nowrap;text-align:center;}
+#warAlert.show{opacity:1;transform:translateX(-50%) scale(1);}
+body.mega-shake{animation:megaShake 1.2s linear;}
+@keyframes megaShake{0%,100%{transform:translate(0) rotate(0)}10%{transform:translate(-14px,8px) rotate(-.4deg)}20%{transform:translate(12px,-10px) rotate(.4deg)}30%{transform:translate(-10px,-6px) rotate(.2deg)}40%{transform:translate(14px,10px) rotate(-.5deg)}55%{transform:translate(-16px,4px) rotate(.5deg)}70%{transform:translate(10px,-8px) rotate(-.3deg)}85%{transform:translate(-6px,4px) rotate(.2deg)}}
+#impactFlash.mega-flash{animation:megaFlash 1.4s;}
+@keyframes megaFlash{0%,100%{opacity:0}12%{opacity:.55}25%{opacity:.08}38%{opacity:.45}50%{opacity:.05}70%{opacity:.28}}
+@media(max-width:800px){#warAlert{top:52px;width:92vw;white-space:normal;font-size:12px;padding:9px 12px;}}
