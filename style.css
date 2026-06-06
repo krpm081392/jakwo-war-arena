@@ -172,35 +172,143 @@
 @media(max-width:800px){.top-deco-layer,.side-deco-layer{display:none}}
 
 
-/* DESKTOP-ONLY UI PATCH: keep mobile unchanged, make PC cleaner/wider like latest working screenshot */
-.desktop-dock{display:none;}
-@media (min-width:801px){
-  body{background:#2b1508;}
-  .topbar{height:42px;padding:4px 18px;background:linear-gradient(180deg,#3b1b0c,#211006);}
-  .brand span{font-size:24px;line-height:.8}.brand small{font-size:9px;letter-spacing:.8px}
-  .wallet,.square{padding:7px 13px;min-width:38px;border-radius:6px;font-size:13px;}
-  .ticker-wrap{top:42px;height:24px;background:#e3c075;}
-  .ticker-wrap b{font-size:12px;padding:0 16px;}
-  .ticker{font-size:13px;}
-  .stats{top:66px;height:42px;padding:5px 12px;gap:8px;background:#2b1308;}
-  .stats div{border-radius:5px;background:#f5df9d;justify-content:flex-start;padding-left:18px;}
-  .stats strong{font-size:18px}.stats span{font-size:10px;}
-  .app{top:108px;grid-template-columns:1fr;background:#2b1508;}
-  .sidebar{display:none!important;}
-  .arena{margin:7px;border:4px solid #4a210c;border-radius:5px;min-height:calc(100vh - 122px);background:
-    radial-gradient(circle at 78% 18%,rgba(95,38,12,.18),transparent 28%),
-    linear-gradient(90deg,rgba(80,36,10,.10) 1px,transparent 1px) 0 0/18px 18px,
-    linear-gradient(0deg,rgba(80,36,10,.08) 1px,transparent 1px) 0 0/18px 18px,
-    linear-gradient(120deg,#edc46f,#d79d4f 55%,#c7883f);
-    box-shadow:inset 0 0 70px rgba(64,26,5,.38),0 0 0 2px rgba(255,227,143,.25);
+/* DESKTOP ONLY PATCH: copy the last working wide UI. Phone CSS is untouched. */
+@media (min-width: 801px){
+  body{background:#2a1206!important;overflow:hidden!important;}
+  .topbar{
+    height:46px!important;
+    padding:4px 10px!important;
+    background:linear-gradient(180deg,#3a1809,#1e0a04)!important;
+    border-bottom:2px solid #120602!important;
+    overflow:visible!important;
   }
-  .cost-badge{right:18px;bottom:82px;padding:8px 11px;border-radius:8px;}
-  .cost-badge b{font-size:15px;}
-  .add-btn{display:none!important;}
-  .desktop-dock{display:flex;align-items:center;gap:8px;position:fixed;right:18px;bottom:12px;z-index:70;}
-  .desktop-dock button{height:48px;border:3px solid #5a2a12;background:linear-gradient(180deg,#f6dc9b,#d59e4d);color:#2a1206;border-radius:7px;font-weight:1000;padding:0 18px;box-shadow:0 4px 0 #2a1206;cursor:pointer;}
-  .desktop-dock #desktopAddBtn{background:linear-gradient(180deg,#d63c2f,#951b14);color:#fff;border-color:#f0c47a;font-size:16px;min-width:190px;}
-  .panel{top:116px!important;left:16px!important;width:380px!important;bottom:72px!important;background:#fff0bf!important;border-color:#542810!important;color:#2c1609!important;}
-  .sheet.open{bottom:72px!important;}
-  .top-deco-layer,.side-deco-layer{display:none!important;}
+  .brand span{font-size:22px!important;letter-spacing:1px!important;}
+  .brand small{font-size:8px!important;letter-spacing:.9px!important;}
+  .top-actions{gap:7px!important;}
+  .wallet,.square{padding:7px 12px!important;border-radius:6px!important;min-width:38px!important;font-size:12px!important;box-shadow:0 3px 0 #130603!important;}
+
+  .ticker-wrap{
+    top:46px!important;
+    height:24px!important;
+    background:#ead098!important;
+    border-bottom:2px solid #2c1206!important;
+  }
+  .ticker-wrap b{font-size:11px!important;padding:0 11px!important;}
+  .ticker{font-size:12px!important;}
+
+  .stats{
+    top:70px!important;
+    height:34px!important;
+    padding:4px 8px!important;
+    gap:8px!important;
+    background:#2a1206!important;
+    border-bottom:2px solid #170702!important;
+  }
+  .stats div{
+    height:25px!important;
+    background:#f4dda4!important;
+    border:2px solid #4b210d!important;
+    border-radius:4px!important;
+    justify-content:flex-start!important;
+    padding:0 14px!important;
+  }
+  .stats strong{font-size:14px!important;min-width:55px!important;text-align:left!important;}
+  .stats span{font-size:8px!important;letter-spacing:.4px!important;}
+
+  .app{
+    top:104px!important;
+    grid-template-columns:1fr!important;
+    background:#3a1a09!important;
+  }
+  .arena{
+    margin:6px!important;
+    border:4px solid #3b1808!important;
+    min-height:calc(100vh - 116px)!important;
+    height:calc(100vh - 116px)!important;
+    overflow:auto!important;
+    background:
+      linear-gradient(rgba(106,58,20,.12) 1px, transparent 1px) 0 0/16px 16px,
+      linear-gradient(90deg, rgba(106,58,20,.12) 1px, transparent 1px) 0 0/16px 16px,
+      radial-gradient(circle at 0 0,rgba(255,241,190,.22),transparent 30%),
+      linear-gradient(110deg,#e0af58 0%,#d49a43 45%,#b86d25 100%)!important;
+    box-shadow:inset 0 0 90px rgba(61,25,5,.45)!important;
+  }
+
+  /* Desktop nav becomes the top-right dock exactly like the working screenshot */
+  .sidebar{
+    position:fixed!important;
+    top:4px!important;
+    right:238px!important;
+    left:auto!important;
+    z-index:80!important;
+    display:flex!important;
+    align-items:center!important;
+    gap:8px!important;
+    width:auto!important;
+    height:42px!important;
+    padding:0!important;
+    background:transparent!important;
+    border:0!important;
+    overflow:visible!important;
+  }
+  .sidebar button{
+    width:auto!important;
+    height:34px!important;
+    margin:0!important;
+    padding:0 17px!important;
+    text-align:center!important;
+    border:2px solid #5a250d!important;
+    background:linear-gradient(180deg,#ffe3a3,#d8a84f)!important;
+    color:#2d1205!important;
+    border-radius:5px!important;
+    box-shadow:0 3px 0 #2d1004!important;
+    font-size:11px!important;
+    white-space:nowrap!important;
+  }
+  .sidebar button:nth-child(2){display:none!important;} /* keep war chat bottom right on desktop */
+  .side-deco-layer,.top-deco-layer{display:none!important;}
+
+  .add-btn{
+    right:16px!important;
+    bottom:10px!important;
+    padding:10px 18px!important;
+    font-size:12px!important;
+    border-radius:5px!important;
+    z-index:70!important;
+  }
+  .cost-badge{
+    right:17px!important;
+    bottom:66px!important;
+    padding:9px 12px!important;
+    border-radius:6px!important;
+    font-size:11px!important;
+  }
+  .mobile-nav{display:none!important;}
+
+  /* Desktop war chat button, clean and separate from add button */
+  body::after{
+    content:'💬 WAR CHAT';
+    position:fixed;
+    right:137px;
+    bottom:10px;
+    z-index:69;
+    background:linear-gradient(180deg,#ffe4a5,#d6a44b);
+    color:#261006;
+    border:3px solid #5c260e;
+    border-radius:5px;
+    padding:10px 18px;
+    font-weight:1000;
+    font-size:12px;
+    box-shadow:0 4px 0 #2d1004;
+    pointer-events:none;
+  }
+
+  .panel{
+    top:112px!important;
+    left:18px!important;
+    width:420px!important;
+    bottom:18px!important;
+    max-height:none!important;
+  }
+  .sheet.open{bottom:62px!important;}
 }

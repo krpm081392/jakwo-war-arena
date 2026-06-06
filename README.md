@@ -1,2 +1,1 @@
-# JAKWO Meme War Ads Arena
-Static no-npm build. Upload all files to GitHub root. Admin direct URL: /admin.html
+JAKWO War Arena - desktop UI patch only, phone UI unchanged. Admin: /admin.html
