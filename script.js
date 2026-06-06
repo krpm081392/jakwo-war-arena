@@ -462,12 +462,28 @@
     return `<h2>🏆 TOP WARLORDS</h2><ol class="leader-list">${top.map(([w,a])=>`<li><b>${esc(w.length>10?shortWallet(w):w)}</b> — ${formatMoney(a)} USDC</li>`).join('')}</ol>`;
   }
   function addAd(src){
+    // Only one unpaid preview is allowed. Choosing another photo replaces the old preview.
+    arena.querySelectorAll('.ad.editing').forEach(n => n.remove());
+    currentAd = null;
+
     const ad = document.createElement('div');
     ad.className = 'ad editing';
-    ad.style.left = '14%'; ad.style.top = '18%'; ad.style.width = '40px'; ad.style.height = '40px';
+
+    // Place preview inside the current camera view using real px, not %, so first drag never jumps.
+    const startX = Math.max(0, (document.querySelector('.app')?.scrollLeft || 0) + 120);
+    const startY = Math.max(0, (document.querySelector('.app')?.scrollTop || 0) + 120);
+    ad.style.left = startX + 'px';
+    ad.style.top = startY + 'px';
+    ad.style.width = '40px';
+    ad.style.height = '40px';
     ad.innerHTML = `<button class="x" title="Remove">×</button><img src="${src}" alt="war ad"><span class="resize"></span>`;
     arena.appendChild(ad);
-    currentAd = ad; ad.dataset.budgetMode='0'; ad.dataset.manualPrice=''; const bi=$('#budgetInput'); if(bi) bi.value=''; makeInteractive(ad); updatePrice();
+    currentAd = ad;
+    ad.dataset.budgetMode='0';
+    ad.dataset.manualPrice='';
+    const bi=$('#budgetInput'); if(bi) bi.value='';
+    makeInteractive(ad);
+    updatePrice();
   }
   function getLocalAds(){
     try { return JSON.parse(localStorage.getItem(ADS_KEY) || '[]'); } catch(_e){ return []; }
@@ -605,31 +621,68 @@
   }
 
   function makeInteractive(el){
-    let dragging=false, resizing=false, sx=0, sy=0, sl=0, st=0, sw=0, sh=0, activePointer=null;
+    let dragging=false, resizing=false, pendingTouch=false;
+    let sx=0, sy=0, sl=0, st=0, sw=0, sh=0, dragOffsetX=0, dragOffsetY=0, activePointer=null, holdTimer=null;
+
+    const clearHold = () => { if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } pendingTouch=false; };
     const stop = (e) => {
+      clearHold();
       dragging = false;
       resizing = false;
       try{ if(activePointer !== null) el.releasePointerCapture?.(activePointer); }catch(_e){}
       activePointer = null;
       document.body.classList.remove('dragging-ad');
     };
-    const down = (e) => {
-      if(el.classList.contains('locked')) return;
-      if(e.pointerType === 'mouse' && e.button !== 0) return;
-      const t = e.target;
-      if(t.classList.contains('x')){ el.remove(); currentAd=null; updatePrice(); return; }
-      sx=e.clientX; sy=e.clientY; sl=parseFloat(el.style.left)||0; st=parseFloat(el.style.top)||0; sw=el.offsetWidth; sh=el.offsetHeight;
-      resizing = t.classList.contains('resize');
-      dragging = !resizing;
+    const beginMove = (e, mode) => {
+      // Use offsetLeft/offsetTop instead of parsing style %, otherwise touch/mouse can jump to top-left.
+      sx=e.clientX; sy=e.clientY; sl=el.offsetLeft || 0; st=el.offsetTop || 0; sw=el.offsetWidth; sh=el.offsetHeight;
+      dragOffsetX = e.clientX - sl;
+      dragOffsetY = e.clientY - st;
+      resizing = mode === 'resize';
+      dragging = mode === 'drag';
       activePointer = e.pointerId;
       el.dataset.budgetMode='0';
       try{ el.setPointerCapture?.(e.pointerId); }catch(_e){}
       document.body.classList.add('dragging-ad');
+    };
+    const down = (e) => {
+      if(el.classList.contains('locked')) return;
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      const t = e.target;
+      if(t.classList.contains('x')){ el.remove(); if(currentAd===el) currentAd=null; updatePrice(); return; }
+      clearHold();
+
+      if(t.classList.contains('resize')){
+        beginMove(e, 'resize');
+        e.preventDefault();
+        return;
+      }
+
+      // Phone: require a tiny hold before moving so normal panning doesn't accidentally throw the photo.
+      if(e.pointerType === 'touch'){
+        pendingTouch = true;
+        activePointer = e.pointerId;
+        sx=e.clientX; sy=e.clientY;
+        holdTimer = setTimeout(() => {
+          if(pendingTouch) beginMove(e, 'drag');
+        }, 170);
+        return;
+      }
+
+      beginMove(e, 'drag');
       e.preventDefault();
     };
     const move = (e) => {
       if(el.classList.contains('locked')) return stop(e);
       if(activePointer !== null && e.pointerId !== activePointer) return;
+
+      if(pendingTouch && !dragging && !resizing){
+        const moved = Math.hypot(e.clientX - sx, e.clientY - sy);
+        // If user swipes instead of holds, cancel photo drag and let arena pan.
+        if(moved > 12) stop(e);
+        return;
+      }
+
       if(!dragging && !resizing) return;
       const dx=e.clientX-sx, dy=e.clientY-sy;
       if(resizing){
@@ -642,8 +695,8 @@
       if(dragging){
         const maxX=Math.max(0, arenaSizeForSave().w - el.offsetWidth);
         const maxY=Math.max(0, arenaSizeForSave().h - el.offsetHeight);
-        el.style.left = Math.min(maxX, Math.max(0, sl+dx))+'px';
-        el.style.top = Math.min(maxY, Math.max(0, st+dy))+'px';
+        el.style.left = Math.min(maxX, Math.max(0, e.clientX - dragOffsetX))+'px';
+        el.style.top = Math.min(maxY, Math.max(0, e.clientY - dragOffsetY))+'px';
       }
       updatePrice();
       e.preventDefault();
