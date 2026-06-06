@@ -582,11 +582,18 @@
     // Merge local paid/deployed backups with Supabase rows. This prevents a paid ad from disappearing
     // after refresh if Supabase insert failed or schema still needs updating.
     const localRows = getLocalAds();
-    const seen = new Set(rows.map(r => String(r.id || r.tx_signature || r.image_url || '')));
-    for(const r of localRows){
-      const key = String(r.id || r.tx_signature || r.image_url || '');
-      if(!seen.has(key)){ rows.push(r); seen.add(key); }
+    const adKey = (r) => String(r.id || r.tx_signature || ((r.image_url||'') + '|' + (r.name||'') + '|' + (r.amount||'')));
+    const dedupedRows = [];
+    const seen = new Set();
+    for(const r of rows){
+      const key = adKey(r);
+      if(key && !seen.has(key)){ dedupedRows.push(r); seen.add(key); }
     }
+    for(const r of localRows){
+      const key = adKey(r);
+      if(key && !seen.has(key)){ dedupedRows.push(r); seen.add(key); }
+    }
+    rows = dedupedRows;
 
     arena.querySelectorAll('.ad.locked').forEach(n => n.remove());
     rows.forEach(renderDeployedAd);
@@ -1013,6 +1020,41 @@
   $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
   $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));
 
+
+
+  function initMobileStageZoom(){
+    const app = document.querySelector('.app');
+    if(!app || !arena) return;
+    let scale = 1;
+    let startDist = 0;
+    let startScale = 1;
+    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+    const apply = ()=>{
+      arena.style.transformOrigin = '0 0';
+      arena.style.transform = `scale(${scale})`;
+      arena.dataset.zoom = String(scale);
+    };
+    const distance = (t1,t2)=>Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
+    app.addEventListener('touchstart', (e)=>{
+      if(e.touches && e.touches.length === 2){
+        startDist = distance(e.touches[0], e.touches[1]);
+        startScale = scale;
+      }
+    }, {passive:true});
+    app.addEventListener('touchmove', (e)=>{
+      if(e.touches && e.touches.length === 2){
+        e.preventDefault();
+        const d = distance(e.touches[0], e.touches[1]);
+        if(startDist > 0){
+          scale = clamp(startScale * (d / startDist), 0.65, 3);
+          apply();
+        }
+      }
+    }, {passive:false});
+    apply();
+  }
+
+  initMobileStageZoom();
   loadDeployedAds(); updateWallet(); renderStats(); updatePrice();
 })();
 
