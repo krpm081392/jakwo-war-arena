@@ -406,3 +406,14 @@ body.mega-shake{animation:megaShake 1.2s linear;}
 /* PATCH: slower readable live ticker */
 .ticker span{animation-duration:90s!important;}
 @media(max-width:800px){.ticker span{animation-duration:90s!important;}}
+
+
+/* PATCH: drag release + phone usability only */
+body.dragging-ad{cursor:grabbing!important;user-select:none!important;}
+.ad{cursor:grab;}
+.ad:active{cursor:grabbing;}
+@media(max-width:800px){
+  .ad{touch-action:none!important;}
+  .resize{width:22px!important;height:22px!important;right:-9px!important;bottom:-9px!important;border-width:3px!important;}
+  .ad .x{width:32px!important;height:32px!important;right:-16px!important;top:-16px!important;}
+}

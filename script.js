@@ -16,6 +16,7 @@
   let currentAd = null;
   let stats = JSON.parse(localStorage.getItem('jakwo_stats_v3_fresh') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
   let chatChannel = null;
+  let adsChannel = null;
   const ADS_KEY = 'jakwo_deployed_ads_v3_fresh';
   const CHAT_KEY = 'jakwo_chat_v3_fresh';
   const STATS_KEY = 'jakwo_stats_v3_fresh';
@@ -604,29 +605,55 @@
   }
 
   function makeInteractive(el){
-    let dragging=false, resizing=false, sx=0, sy=0, sl=0, st=0, sw=0, sh=0;
+    let dragging=false, resizing=false, sx=0, sy=0, sl=0, st=0, sw=0, sh=0, activePointer=null;
+    const stop = (e) => {
+      dragging = false;
+      resizing = false;
+      try{ if(activePointer !== null) el.releasePointerCapture?.(activePointer); }catch(_e){}
+      activePointer = null;
+      document.body.classList.remove('dragging-ad');
+    };
     const down = (e) => {
       if(el.classList.contains('locked')) return;
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
       const t = e.target;
       if(t.classList.contains('x')){ el.remove(); currentAd=null; updatePrice(); return; }
-      const p = e.touches ? e.touches[0] : e;
-      sx=p.clientX; sy=p.clientY; sl=parseFloat(el.style.left)||0; st=parseFloat(el.style.top)||0; sw=el.offsetWidth; sh=el.offsetHeight;
-      resizing = t.classList.contains('resize'); dragging = !resizing; el.dataset.budgetMode='0'; el.setPointerCapture?.(e.pointerId||0);
+      sx=e.clientX; sy=e.clientY; sl=parseFloat(el.style.left)||0; st=parseFloat(el.style.top)||0; sw=el.offsetWidth; sh=el.offsetHeight;
+      resizing = t.classList.contains('resize');
+      dragging = !resizing;
+      activePointer = e.pointerId;
+      el.dataset.budgetMode='0';
+      try{ el.setPointerCapture?.(e.pointerId); }catch(_e){}
+      document.body.classList.add('dragging-ad');
+      e.preventDefault();
     };
     const move = (e) => {
-      if(el.classList.contains('locked')) return;
+      if(el.classList.contains('locked')) return stop(e);
+      if(activePointer !== null && e.pointerId !== activePointer) return;
       if(!dragging && !resizing) return;
-      const p = e.touches ? e.touches[0] : e; const dx=p.clientX-sx, dy=p.clientY-sy;
+      const dx=e.clientX-sx, dy=e.clientY-sy;
       if(resizing){
         el.dataset.manualPrice = '';
-        el.style.width = Math.max(40, sw+dx)+'px';
-        el.style.height = Math.max(40, sh+dy)+'px';
+        const maxW = Math.max(40, arenaSizeForSave().w - sl);
+        const maxH = Math.max(40, arenaSizeForSave().h - st);
+        el.style.width = Math.min(maxW, Math.max(40, sw+dx))+'px';
+        el.style.height = Math.min(maxH, Math.max(40, sh+dy))+'px';
       }
-      if(dragging){ const maxX=Math.max(0, arenaSizeForSave().w - el.offsetWidth); const maxY=Math.max(0, arenaSizeForSave().h - el.offsetHeight); el.style.left = Math.min(maxX, Math.max(0, sl+dx))+'px'; el.style.top = Math.min(maxY, Math.max(0, st+dy))+'px'; }
-      updatePrice(); e.preventDefault();
+      if(dragging){
+        const maxX=Math.max(0, arenaSizeForSave().w - el.offsetWidth);
+        const maxY=Math.max(0, arenaSizeForSave().h - el.offsetHeight);
+        el.style.left = Math.min(maxX, Math.max(0, sl+dx))+'px';
+        el.style.top = Math.min(maxY, Math.max(0, st+dy))+'px';
+      }
+      updatePrice();
+      e.preventDefault();
     };
-    const up = ()=>{dragging=false; resizing=false};
-    el.addEventListener('pointerdown', down); window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    el.addEventListener('pointerdown', down);
+    window.addEventListener('pointermove', move, {passive:false});
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('blur', stop);
+    document.addEventListener('mouseleave', stop);
   }
   async function connect(){
     try{
@@ -1022,6 +1049,22 @@
 
 
 
+
+  function setupAdsRealtime(){
+    if(!supa) return;
+    try{
+      if(adsChannel) supa.removeChannel(adsChannel);
+      adsChannel = supa.channel('jakwo-war-ads-live')
+        .on('postgres_changes', { event:'*', schema:'public', table:'ads' }, async () => {
+          await loadDeployedAds();
+        })
+        .subscribe((status)=>{
+          console.log('ADS REALTIME:', status);
+          if(status === 'SUBSCRIBED') loadDeployedAds();
+        });
+    }catch(e){ console.warn('Supabase ads realtime failed:', e); }
+  }
+
   function initMobileStageZoom(){
     const app = document.querySelector('.app');
     if(!app || !arena) return;
@@ -1055,7 +1098,7 @@
   }
 
   initMobileStageZoom();
-  loadDeployedAds(); updateWallet(); renderStats(); updatePrice();
+  loadDeployedAds(); setupAdsRealtime(); updateWallet(); renderStats(); updatePrice();
 })();
 
 /* PATCH: draggable/playable decorative stickers in sidebar/topbar only */
