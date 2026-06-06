@@ -24,6 +24,20 @@
     return null;
   })();
 
+  function setVoucherStatus(msg, type='info'){
+    let el = document.getElementById('voucherStatus');
+    const input = document.getElementById('voucherCode');
+    if(!el && input){
+      el = document.createElement('div');
+      el.id = 'voucherStatus';
+      el.style.cssText = 'font-size:12px;font-weight:900;margin:3px 0 6px;min-height:16px;color:#f6e7bb;';
+      input.insertAdjacentElement('afterend', el);
+    }
+    if(!el) return;
+    el.textContent = msg || '';
+    el.style.color = type === 'ok' ? '#24ff66' : type === 'bad' ? '#ff5757' : '#f6e7bb';
+  }
+
 
   if(new URLSearchParams(location.search).get('reset') === '1'){
     try{
@@ -413,18 +427,30 @@
   function setLocalAds(rows){
     localStorage.setItem(ADS_KEY, JSON.stringify(rows || []));
   }
+  function arenaSizeForSave(){
+    return {
+      w: Math.max(1, arena.scrollWidth || arena.clientWidth || arena.getBoundingClientRect().width || 1),
+      h: Math.max(1, arena.scrollHeight || arena.clientHeight || arena.getBoundingClientRect().height || 1)
+    };
+  }
   function adRecordFromElement(el, amount){
     const img = el.querySelector('img');
+    const size = arenaSizeForSave();
+    const x = parseFloat(el.style.left) || 0;
+    const y = parseFloat(el.style.top) || 0;
+    const w = el.offsetWidth || parseFloat(el.style.width) || 40;
+    const h = el.offsetHeight || parseFloat(el.style.height) || 40;
     return {
       id: el.dataset.id || ('ad_' + Date.now() + '_' + Math.random().toString(16).slice(2)),
       image_url: img ? img.src : '',
       link: el.dataset.link || '',
       wallet: wallet || '',
       amount: Number(amount || 0),
-      x: parseFloat(el.style.left) || 0,
-      y: parseFloat(el.style.top) || 0,
-      w: el.offsetWidth || parseFloat(el.style.width) || 40,
-      h: el.offsetHeight || parseFloat(el.style.height) || 40,
+      x, y, w, h,
+      x_percent: (x / size.w) * 100,
+      y_percent: (y / size.h) * 100,
+      w_percent: (w / size.w) * 100,
+      h_percent: (h / size.h) * 100,
       name: el.dataset.name || 'War Ad',
       locked: true,
       created_at: new Date().toISOString()
@@ -437,10 +463,16 @@
     ad.dataset.id = r.id || '';
     ad.dataset.name = r.name || 'War Ad';
     ad.dataset.link = r.link || '';
-    ad.style.left = (Number(r.x) || 0) + 'px';
-    ad.style.top = (Number(r.y) || 0) + 'px';
-    ad.style.width = Math.max(40, Number(r.w) || 40) + 'px';
-    ad.style.height = Math.max(40, Number(r.h) || 40) + 'px';
+    const size = arenaSizeForSave();
+    const hasPct = r.x_percent !== undefined && r.x_percent !== null && r.w_percent !== undefined && r.w_percent !== null;
+    const x = hasPct ? (Number(r.x_percent) || 0) / 100 * size.w : (Number(r.x) || 0);
+    const y = hasPct ? (Number(r.y_percent) || 0) / 100 * size.h : (Number(r.y) || 0);
+    const w = hasPct ? (Number(r.w_percent) || 0) / 100 * size.w : (Number(r.w) || 40);
+    const h = hasPct ? (Number(r.h_percent) || 0) / 100 * size.h : (Number(r.h) || 40);
+    ad.style.left = Math.max(0, x) + 'px';
+    ad.style.top = Math.max(0, y) + 'px';
+    ad.style.width = Math.max(40, w) + 'px';
+    ad.style.height = Math.max(40, h) + 'px';
     ad.innerHTML = `<img src="${r.image_url}" alt="war ad">`;
     if(r.link){
       ad.classList.add('clickable-ad');
@@ -457,7 +489,7 @@
     setLocalAds(rows);
     if(supa){
       try{
-        const dbRec = { image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, x: rec.x, y: rec.y, w: rec.w, h: rec.h, name: rec.name, locked: true, voucher_code: cleanVoucher($('#voucherCode')?.value || '') || null, tx_signature: el.dataset.tx || null };
+        const dbRec = { image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, x: rec.x, y: rec.y, w: rec.w, h: rec.h, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent, name: rec.name, locked: true, voucher_code: cleanVoucher($('#voucherCode')?.value || '') || null, tx_signature: el.dataset.tx || null };
         const oldId = rec.id;
         const { data, error } = await supa.from('ads').insert(dbRec).select('id').single();
         if(!error && data?.id){ rec.id = data.id; el.dataset.id = data.id; const updated = getLocalAds().filter(a => a.id !== oldId && a.id !== data.id); updated.push({...rec, id:data.id}); setLocalAds(updated); }
@@ -577,6 +609,35 @@
     if(!m) return 0;
     if(m[1] === '050') return 0.5;
     return Number(m[1]);
+  }
+  async function lookupVoucher(code){
+    const c = cleanVoucher(code);
+    if(!c) return { ok:false, reason:'empty', tier:0 };
+    if(!supa){
+      const tier = voucherValue(c);
+      if(c === 'TEST' || tier > 0) return { ok:!isVoucherUsed(c), reason:isVoucherUsed(c)?'used':'valid', tier, local:true };
+      return { ok:false, reason:'invalid', tier:0 };
+    }
+    try{
+      // Use limit(1), not .single(), so unused/invalid vouchers do not throw 406.
+      const { data, error } = await supa.from('voucher_codes').select('*').eq('code', c).limit(1);
+      if(error){ console.warn('Voucher lookup error:', error); return { ok:false, reason:'invalid', error, tier:0 }; }
+      const row = Array.isArray(data) && data.length ? data[0] : null;
+      if(!row) return { ok:false, reason:'invalid', tier:0 };
+      if(row.disabled) return { ok:false, reason:'disabled', row, tier:Number(row.tier)||0 };
+      if(row.used) return { ok:false, reason:'used', row, tier:Number(row.tier)||0 };
+      return { ok:true, reason:'valid', row, tier:Number(row.tier)||0 };
+    }catch(e){
+      console.warn('Voucher lookup exception:', e);
+      return { ok:false, reason:'invalid', error:e, tier:0 };
+    }
+  }
+  function showVoucherResult(v){
+    if(!v || v.reason === 'empty') return setVoucherStatus('');
+    if(v.ok) return setVoucherStatus(`✅ Voucher valid: ${formatMoney(v.tier || 0)} USDC`, 'ok');
+    if(v.reason === 'used') return setVoucherStatus('❌ Voucher already used', 'bad');
+    if(v.reason === 'disabled') return setVoucherStatus('❌ Voucher disabled', 'bad');
+    return setVoucherStatus('❌ Invalid voucher', 'bad');
   }
   function resizeAdToPrice(target, updateInput=false){
     if(!currentAd || !target) return;
@@ -741,30 +802,19 @@
 
     let paymentSignature = '';
     if(voucher){
-      if(isVoucherUsed(voucher)){
-        alert('This voucher was already used on this browser. One voucher = one ad only.'); return;
+      const vcheck = await lookupVoucher(voucher);
+      showVoucherResult(vcheck);
+      if(!vcheck.ok){
+        alert(vcheck.reason === 'used' ? 'Voucher already used.' : vcheck.reason === 'disabled' ? 'Voucher disabled.' : 'Invalid voucher code.');
+        return;
       }
-      let voucherTier = voucherValue(voucher);
-      let dbVoucher = null;
-      if(supa){
-        try{
-          const { data, error } = await supa.from('voucher_codes').select('*').eq('code', voucher).single();
-          if(error || !data) throw error || new Error('Voucher not found');
-          if(data.used || data.disabled){ alert('Voucher already used or disabled.'); return; }
-          dbVoucher = data;
-          voucherTier = Number(data.tier) || voucherTier;
-        }catch(e){
-          alert('Invalid voucher code.'); return;
-        }
-      } else if(!(location.hostname === 'localhost' && voucher === 'TEST')){
-        alert('Voucher validation needs Supabase.'); return;
-      }
+      let voucherTier = Number(vcheck.tier) || voucherValue(voucher) || 0.5;
       if(voucherTier > 0){
         resizeAdToPrice(voucherTier);
         p = priceFor(currentAd);
         p.price = voucherTier;
       }
-      currentAd.dataset.voucherId = dbVoucher?.id || '';
+      currentAd.dataset.voucherId = vcheck.row?.id || '';
     } else {
       try{
         $('#deployBtn').disabled = true;
@@ -799,7 +849,12 @@
     if(voucher){
       markVoucherUsed(voucher);
       if(supa && deployedAd.dataset.voucherId){
-        try{ await supa.from('voucher_codes').update({ used:true, used_by: wallet, used_at: new Date().toISOString() }).eq('id', deployedAd.dataset.voucherId); }catch(e){ console.warn('Voucher update failed:', e); }
+        try{
+          await supa.from('voucher_codes').update({ used:true, used_by: wallet, used_at: new Date().toISOString() }).eq('id', deployedAd.dataset.voucherId);
+          setVoucherStatus('✅ Voucher used and burned', 'ok');
+        }catch(e){ console.warn('Voucher update failed:', e); }
+      } else {
+        setVoucherStatus('✅ Voucher used', 'ok');
       }
     }
     if(paymentSignature) deployedAd.dataset.tx = paymentSignature;
@@ -834,8 +889,22 @@
   budgetEl?.addEventListener('keyup', applyBudget);
   budgetEl?.addEventListener('change', applyBudget);
   budgetEl?.addEventListener('blur', applyBudget);
-  $('#voucherCode').addEventListener('change', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
-  $('#voucherCode').addEventListener('input', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
+  let voucherTimer;
+  const handleVoucherInput = (e) => {
+    const code = cleanVoucher(e.target.value);
+    clearTimeout(voucherTimer);
+    if(!code){ setVoucherStatus(''); return; }
+    const rough = voucherValue(code);
+    if(rough) resizeAdToPrice(rough);
+    setVoucherStatus('Checking voucher...');
+    voucherTimer = setTimeout(async()=>{
+      const result = await lookupVoucher(code);
+      showVoucherResult(result);
+      if(result.ok && result.tier) resizeAdToPrice(result.tier);
+    }, 350);
+  };
+  $('#voucherCode').addEventListener('change', handleVoucherInput);
+  $('#voucherCode').addEventListener('input', handleVoucherInput);
   $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };
   $$('#xLink').forEach(a=>a.href=config.twitter||a.href); $$('#tgLink').forEach(a=>a.href=config.telegram||a.href);
   $$('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel)));

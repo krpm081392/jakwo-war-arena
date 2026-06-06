@@ -68,3 +68,9 @@ exception when duplicate_object then null; when undefined_object then null; end 
 do $$ begin
   alter publication supabase_realtime add table ads;
 exception when duplicate_object then null; when undefined_object then null; end $$;
+
+-- Position persistence patch: store ad placement as arena percentages so ads return to the same spot after refresh/device changes.
+alter table ads add column if not exists x_percent numeric;
+alter table ads add column if not exists y_percent numeric;
+alter table ads add column if not exists w_percent numeric;
+alter table ads add column if not exists h_percent numeric;
