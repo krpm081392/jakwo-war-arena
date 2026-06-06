@@ -182,9 +182,19 @@
     $('#latestWar').textContent = stats.latest || 'None';
     $('#topWarlord').textContent = stats.top || 'None';
   }
+  function parseMoneyValue(raw){
+    let txt = String(raw || '').trim().toLowerCase().replace(/[$,\s]/g,'');
+    if(!txt) return 0;
+    let mult = 1;
+    if(txt.endsWith('m')){ mult = 1000000; txt = txt.slice(0,-1); }
+    else if(txt.endsWith('k')){ mult = 1000; txt = txt.slice(0,-1); }
+    const v = Number(txt);
+    if(!Number.isFinite(v)) return 0;
+    return v * mult;
+  }
   function manualBudgetValue(){
     const input = $('#budgetInput');
-    const v = input ? Number(input.value) : 0;
+    const v = input ? parseMoneyValue(input.value) : 0;
     return Number.isFinite(v) && v >= 0.5 ? Math.max(0.5, Math.min(1000000, v)) : 0;
   }
   function arenaPricingArea(){
@@ -680,8 +690,21 @@
   $('#addBtn').onclick = openSheet; $('#mobileAddBtn').onclick = openSheet; $('#closeSheet').onclick = closeSheet;
   $('#closePanel').onclick = closePanel;
   $('#deployBtn').onclick = deploy;
-  $('#budgetInput')?.addEventListener('change', e => { let v = Number(e.target.value); if(!Number.isFinite(v) || v < 0.5) v = 0.5; e.target.value = v.toFixed(2); resizeAdToPrice(v); });
-  $('#budgetInput')?.addEventListener('input', e => { const v = Number(e.target.value); if(v >= 0.5) resizeAdToPrice(v); });
+  const budgetEl = $('#budgetInput');
+  const applyBudget = (normalize=false) => {
+    if(!budgetEl) return;
+    let v = parseMoneyValue(budgetEl.value);
+    if(!Number.isFinite(v) || v < 0.5) v = normalize ? 0.5 : 0;
+    if(v){
+      v = Math.max(0.5, Math.min(1000000, v));
+      if(normalize) budgetEl.value = v.toFixed(2);
+      resizeAdToPrice(v);
+    }
+  };
+  budgetEl?.addEventListener('input', () => applyBudget(false));
+  budgetEl?.addEventListener('keyup', () => applyBudget(false));
+  budgetEl?.addEventListener('change', () => applyBudget(true));
+  budgetEl?.addEventListener('blur', () => applyBudget(true));
   $('#voucherCode').addEventListener('change', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#voucherCode').addEventListener('input', e => { const v = voucherValue(e.target.value); if(v) resizeAdToPrice(v); });
   $('#imageInput').onchange = (e)=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>addAd(r.result); r.readAsDataURL(file); };

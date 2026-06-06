@@ -285,3 +285,81 @@
   .panel p,.panel li{font-size:13px!important;line-height:1.36!important;}
   .panel blockquote{margin:8px 0;padding:8px 12px;background:#f6e0a6;border-left:4px solid #a32018;font-weight:900;}
 }
+
+
+/* FINAL USER REQUEST FIX 2026-06-06: right-side panels, no button overlap, keep arena space */
+@media (min-width:801px){
+  /* Rules / Story / Leaderboard open on RIGHT side, not center and not left */
+  .panel:not([data-type="chat"]){
+    position:fixed!important;
+    left:auto!important;
+    right:14px!important;
+    top:118px!important;
+    bottom:78px!important;
+    transform:none!important;
+    width:430px!important;
+    max-width:430px!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:auto!important;
+    padding:18px!important;
+    border-radius:8px!important;
+    background:#fff0c5!important;
+    box-shadow:-8px 10px 24px rgba(50,24,7,.45)!important;
+  }
+  /* War chat opens above the War Chat button on bottom-right */
+  .panel[data-type="chat"]{
+    position:fixed!important;
+    left:auto!important;
+    right:14px!important;
+    top:auto!important;
+    bottom:78px!important;
+    transform:none!important;
+    width:360px!important;
+    height:420px!important;
+    max-height:420px!important;
+    padding:16px!important;
+    border-radius:10px!important;
+    background:#fff0c5!important;
+    box-shadow:-8px 10px 24px rgba(50,24,7,.45)!important;
+  }
+  .panel .close{position:absolute!important;right:10px!important;top:10px!important;}
+
+  /* Bottom buttons: never overlap */
+  .add-btn{
+    right:14px!important;
+    bottom:14px!important;
+    width:220px!important;
+    min-width:220px!important;
+    height:52px!important;
+    padding:0 12px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    white-space:nowrap!important;
+    line-height:1!important;
+    font-size:16px!important;
+    text-align:center!important;
+  }
+  .chat-dock{
+    right:246px!important;
+    bottom:14px!important;
+    width:150px!important;
+    min-width:150px!important;
+    height:52px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    white-space:nowrap!important;
+    font-size:15px!important;
+  }
+  .cost-badge{right:14px!important;bottom:78px!important;}
+
+  /* Add-photo sheet sits above bottom buttons and does not cover them */
+  .sheet{right:14px!important;left:auto!important;transform:none!important;width:340px!important;bottom:-110%!important;}
+  .sheet.open{bottom:78px!important;}
+}
+
+@media (max-width:800px){
+  .add-btn{white-space:normal!important;}
+}
