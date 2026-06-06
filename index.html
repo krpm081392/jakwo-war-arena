@@ -10,18 +10,11 @@
 <body>
   <div id="impactFlash"></div>
   <header class="topbar">
-    <div class="top-deco-layer" aria-hidden="true">
-      <div class="wojak-card top-w1" data-spin="1"><b>COPE HARDER</b><span class="face"><img src="assets/memes/10944.jpg" alt="Cope harder"></span></div>
-      <div class="wojak-card top-w2" data-spin="1"><b>DEGEN BRAIN</b><span class="face"><img src="assets/memes/10945.jpg" alt="Degen brain"></span></div>
-      <div class="wojak-card top-w3" data-spin="1"><b>MARKET PAIN</b><span class="face"><img src="market-pain.jpg" alt="Market pain"></span></div>
-      <div class="wojak-card top-w4" data-spin="1"><b>WAGMI?</b><span class="face"><img src="wagmi-pino.jpg" alt="Wagmi"></span></div>
-      <div class="wojak-card top-w5" data-spin="1"><b>RUG SEASON</b><span class="face"><img src="rug-season.jpg" alt="Rug season"></span></div>
-      <div class="wojak-card top-w6" data-spin="1"><b>OLD WAR</b><span class="face"><img src="old-war.jpg" alt="Old war"></span></div>
-      <div class="wojak-card top-w7" data-spin="1"><b>EXIT LIQUIDITY</b><span class="face"><img src="exit-liquidity.jpg" alt="Exit liquidity"></span></div>
-      <div class="wojak-card top-w8" data-spin="1"><b>WE ARE EARLY</b><span class="face"><img src="we-are-early.jpg" alt="We are early"></span></div>
-    </div>
-    <div class="brand"><img class="brand-wojak" src="assets/wojak-thinking.jpeg" alt="Wojak"><div class="brand-copy"><span>JAKWO</span><small>MEME WAR ADS ARENA</small></div></div>
+    <div class="brand"><img class="brand-wojak" src="wojak-logo.jpg" alt="Wojak"><div><span>JAKWO</span><small>MEME WAR ADS ARENA</small></div></div>
     <div class="top-actions">
+      <button class="navbtn" data-panel="story">📖 STORY</button>
+      <button class="navbtn" data-panel="leaderboard">🏆 LEADERBOARD</button>
+      <button class="navbtn" data-panel="rules">📜 RULES</button>
       <button id="connectBtn" class="wallet">CONNECT</button>
       <a id="xLink" class="square" href="https://x.com/jakw0o" target="_blank" rel="noopener">𝕏</a>
       <a id="tgLink" class="square tg" href="https://t.me/+hJ-0IQGfYTRmYjM0" target="_blank" rel="noopener">TG</a>
@@ -46,23 +39,13 @@
       <button data-panel="chat">💬 <span>War Chat</span></button>
       <button data-panel="story">📖 <span>Story</span></button>
       <button data-panel="leaderboard">🏆 <span>Leaderboard</span></button>
-      <div class="side-deco-layer" aria-hidden="true">
-        <div class="wojak-card side-w1" data-spin="1"><b>OLD WAR</b><span class="face"><img src="old-war.jpg" alt="Old war"></span></div>
-        <div class="wojak-card side-w2" data-spin="1"><b>EXIT LIQUIDITY</b><span class="face"><img src="exit-liquidity.jpg" alt="Exit liquidity"></span></div>
-        <div class="wojak-card side-w3" data-spin="1"><b>WE ARE EARLY</b><span class="face"><img src="we-are-early.jpg" alt="We are early"></span></div>
-        <div class="wojak-card side-w4" data-spin="1"><b>SLEEP IS FUD</b><span class="face"><img src="sleep-is-fud.jpg" alt="Sleep is fud"></span></div>
-        <div class="wojak-card side-w5" data-spin="1"><b>WAGMI?</b><span class="face"><img src="wagmi-pino.jpg" alt="Wagmi"></span></div>
-        <div class="wojak-card side-w6" data-spin="1"><b>MARKET PAIN</b><span class="face"><img src="market-pain.jpg" alt="Market pain"></span></div>
-        <div class="wojak-card side-w7" data-spin="1"><b>RUG SEASON</b><span class="face"><img src="rug-season.jpg" alt="Rug season"></span></div>
-        <div class="wojak-card side-w8" data-spin="1"><b>COPE HARDER</b><span class="face"><img src="assets/memes/10944.jpg" alt="Cope harder"></span></div>
-      </div>
     </nav>
 
     <section id="arena" class="arena">
     </section>
 
     <aside class="cost-badge"><small>WAR COST</small><b id="costText">0.50 USDC</b></aside>
-    <button id="desktopChatBtn" class="desktop-chat-btn" data-panel="chat">💬 WAR CHAT</button>
+    <button id="chatDockBtn" class="chat-dock" data-panel="chat">💬 WAR CHAT</button>
     <button id="addBtn" class="add-btn">+ ADD WAR PHOTO</button>
   </main>
 
