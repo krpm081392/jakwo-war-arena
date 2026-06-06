@@ -309,7 +309,7 @@
     const map = {
       rules: rulesHTML,
       story: storyHTML,
-      leaderboard: `<h2>🏆 TOP WARLORDS</h2><p>No confirmed paid warlords yet.</p><p>Leaderboard will rank advertisers by real paid volume.</p>`,
+      leaderboard: leaderboardHTML(),
       chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
     };
     panel.dataset.type = type;
@@ -414,8 +414,46 @@
       alertBox.classList.remove('show');
     }, dur);
   }
+  function paidAmount(r){ return Math.max(0, Number(r?.amount || 0)); }
+  function adDisplayName(r){ return (r?.name || r?.ad_name || 'War Ad').toString().slice(0,40); }
+  function buildLiveFeed(rows){
+    const latest10 = (rows || []).slice(-10).reverse();
+    if(!latest10.length) return 'Buy. Place. Block. Repeat. • Every ad is permanent • Bigger space costs more • New ads can cover old ads • No refunds after deployment •';
+    return latest10.map(r => `🚨 ${adDisplayName(r)} launched a new war ad for ${paidAmount(r).toFixed(2)} USDC`).join(' • ') + ' •';
+  }
   function announce(name, price){
-    $('#tickerText').textContent = `🚨 ${name} launched a new war ad for ${price.toFixed(2)} USDC • Buy. Place. Block. Repeat. • New ads can cover old ads •`;
+    const txt = `🚨 ${name} launched a new war ad for ${Number(price||0).toFixed(2)} USDC • `;
+    const current = ($('#tickerText').textContent || '').split(' • ').filter(Boolean);
+    const cleaned = current.filter(x => !/Buy\. Place|Every ad|Bigger space|New ads|No refunds/i.test(x));
+    const next = [txt.replace(/ • $/,''), ...cleaned].slice(0,10).join(' • ') + ' •';
+    $('#tickerText').textContent = next;
+  }
+  function refreshStatsFromRows(rows){
+    rows = Array.isArray(rows) ? rows : [];
+    stats.total = rows.length;
+    stats.volume = rows.reduce((sum, r) => sum + paidAmount(r), 0);
+    const latest = rows[rows.length - 1];
+    stats.latest = latest ? adDisplayName(latest) : 'None';
+    const paidByWallet = {};
+    rows.forEach(r => {
+      const amt = paidAmount(r);
+      if(amt > 0){
+        const key = r.wallet || 'Anon';
+        paidByWallet[key] = (paidByWallet[key] || 0) + amt;
+      }
+    });
+    const top = Object.entries(paidByWallet).sort((a,b)=>b[1]-a[1])[0];
+    stats.top = top ? (top[0].length > 10 ? shortWallet(top[0]) : top[0]) : 'None';
+    const t = $('#tickerText'); if(t) t.textContent = buildLiveFeed(rows);
+    saveStats(); renderStats();
+  }
+  function leaderboardHTML(){
+    const rows = window.__JAKWO_ROWS || [];
+    const paidByWallet = {};
+    rows.forEach(r => { const amt = paidAmount(r); if(amt>0){ const k=r.wallet||'Anon'; paidByWallet[k]=(paidByWallet[k]||0)+amt; } });
+    const top = Object.entries(paidByWallet).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    if(!top.length) return `<h2>🏆 TOP WARLORDS</h2><p>No confirmed paid warlords yet.</p><p>Leaderboard will rank advertisers by real paid volume.</p>`;
+    return `<h2>🏆 TOP WARLORDS</h2><ol class="leader-list">${top.map(([w,a])=>`<li><b>${esc(w.length>10?shortWallet(w):w)}</b> — ${formatMoney(a)} USDC</li>`).join('')}</ol>`;
   }
   function addAd(src){
     const ad = document.createElement('div');
@@ -440,8 +478,10 @@
   function adRecordFromElement(el, amount){
     const img = el.querySelector('img');
     const size = arenaSizeForSave();
-    const x = parseFloat(el.style.left) || 0;
-    const y = parseFloat(el.style.top) || 0;
+    const ar = arena.getBoundingClientRect();
+    const er = el.getBoundingClientRect();
+    const x = Math.max(0, (er.left - ar.left) + (arena.scrollLeft || 0));
+    const y = Math.max(0, (er.top - ar.top) + (arena.scrollTop || 0));
     const w = el.offsetWidth || parseFloat(el.style.width) || 40;
     const h = el.offsetHeight || parseFloat(el.style.height) || 40;
     return {
@@ -551,19 +591,8 @@
     arena.querySelectorAll('.ad.locked').forEach(n => n.remove());
     rows.forEach(renderDeployedAd);
 
-    if(rows.length){
-      stats.total = rows.length;
-      stats.volume = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-      const latest = rows[rows.length - 1];
-      stats.latest = latest?.name || 'Latest War';
-      const byWallet = {};
-      rows.forEach(r => { const w = r.wallet || 'Anon'; byWallet[w] = (byWallet[w] || 0) + (Number(r.amount) || 0); });
-      const top = Object.entries(byWallet).sort((a,b)=>b[1]-a[1])[0];
-      stats.top = top ? (top[0].length > 10 ? shortWallet(top[0]) : top[0]) : 'None';
-    } else {
-      stats.total = 0; stats.volume = 0; stats.latest = 'None'; stats.top = 'None';
-    }
-    saveStats(); renderStats();
+    window.__JAKWO_ROWS = rows;
+    refreshStatsFromRows(rows);
   }
 
   function makeInteractive(el){
@@ -585,7 +614,7 @@
         el.style.width = Math.max(40, sw+dx)+'px';
         el.style.height = Math.max(40, sh+dy)+'px';
       }
-      if(dragging){ el.style.left = Math.max(0, sl+dx)+'px'; el.style.top = Math.max(0, st+dy+arena.scrollTop)+'px'; }
+      if(dragging){ const maxX=Math.max(0, arenaSizeForSave().w - el.offsetWidth); const maxY=Math.max(0, arenaSizeForSave().h - el.offsetHeight); el.style.left = Math.min(maxX, Math.max(0, sl+dx))+'px'; el.style.top = Math.min(maxY, Math.max(0, st+dy))+'px'; }
       updatePrice(); e.preventDefault();
     };
     const up = ()=>{dragging=false; resizing=false};
@@ -914,7 +943,7 @@
     await saveDeployedAd(deployedAd, voucher ? 0 : p.price);
     console.log('AD SAVE STEP FINISHED');
     $('#voucherCode').value = '';
-    stats.total += 1; stats.volume += voucher ? 0 : Number(p.price || 0); stats.latest = name; stats.top = name; saveStats(); renderStats(); announce(name, voucher ? 0 : p.price); impact(voucher ? 0 : p.price); closeSheet(); currentAd=null; updatePrice();
+    announce(name, voucher ? 0 : p.price); impact(voucher ? 0 : p.price); await loadDeployedAds(); closeSheet(); currentAd=null; updatePrice();
     $('#deployBtn').disabled = false;
     $('#deployBtn').textContent = 'DEPLOY TO WAR';
     alert(paymentSignature ? 'Payment confirmed. Ad deployed and locked forever.' : 'Voucher accepted. Ad deployed and locked forever.');

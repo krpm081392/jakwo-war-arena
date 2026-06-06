@@ -372,3 +372,9 @@ body.mega-shake{animation:megaShake 1.2s linear;}
 #impactFlash.mega-flash{animation:megaFlash 1.4s;}
 @keyframes megaFlash{0%,100%{opacity:0}12%{opacity:.55}25%{opacity:.08}38%{opacity:.45}50%{opacity:.05}70%{opacity:.28}}
 @media(max-width:800px){#warAlert{top:52px;width:92vw;white-space:normal;font-size:12px;padding:9px 12px;}}
+
+/* PATCH: mobile war stage can be panned with finger; header/nav remain fixed */
+@media(max-width:800px){
+  .app{overflow:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-x pan-y!important;}
+  .arena{width:1400px!important;min-width:1400px!important;height:1200px!important;min-height:1200px!important;overflow:visible!important;touch-action:pan-x pan-y!important;}
+}
