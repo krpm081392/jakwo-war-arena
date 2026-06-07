@@ -615,6 +615,29 @@
   function setLocalAds(rows){
     localStorage.setItem(ADS_KEY, JSON.stringify(rows || []));
   }
+  const PENDING_ADS_KEY = 'jakwo_pending_paid_ads_v1';
+  function getPendingPaidAds(){
+    try { return JSON.parse(localStorage.getItem(PENDING_ADS_KEY) || '[]'); } catch(_e){ return []; }
+  }
+  function setPendingPaidAds(rows){
+    localStorage.setItem(PENDING_ADS_KEY, JSON.stringify(rows || []));
+  }
+  async function retryPendingPaidAds(){
+    if(!supa) return;
+    const pending = getPendingPaidAds();
+    if(!pending.length) return;
+    const stillPending = [];
+    for(const rec of pending){
+      try{
+        const { error } = await supa.from('ads').insert(rec);
+        if(error) throw error;
+      }catch(e){
+        console.warn('Pending paid ad sync still failed:', e);
+        stillPending.push(rec);
+      }
+    }
+    setPendingPaidAds(stillPending);
+  }
   function arenaSizeForSave(){
     // Fixed forever world size. Do not use screen size here.
     return { w: ARENA_WIDTH, h: ARENA_HEIGHT };
@@ -650,11 +673,12 @@
     ad.dataset.name = r.name || 'War Ad';
     ad.dataset.link = r.link || '';
     const size = arenaSizeForSave();
-    const hasPct = r.x_percent !== undefined && r.x_percent !== null && r.w_percent !== undefined && r.w_percent !== null;
-    const x = hasPct ? (Number(r.x_percent) || 0) / 100 * size.w : (Number(r.x) || 0);
-    const y = hasPct ? (Number(r.y_percent) || 0) / 100 * size.h : (Number(r.y) || 0);
-    const w = hasPct ? (Number(r.w_percent) || 0) / 100 * size.w : (Number(r.w) || 40);
-    const h = hasPct ? (Number(r.h_percent) || 0) / 100 * size.h : (Number(r.h) || 40);
+    // IMPORTANT: placement must stay exactly where the user dropped/resized it.
+    // Use saved pixel values only; do not recalculate from percentage fields.
+    const x = Number(r.x) || 0;
+    const y = Number(r.y) || 0;
+    const w = Number(r.w) || 40;
+    const h = Number(r.h) || 40;
     ad.style.left = Math.max(0, x) + 'px';
     ad.style.top = Math.max(0, y) + 'px';
     ad.style.width = Math.max(40, w) + 'px';
@@ -680,20 +704,21 @@
       try{
         const voucherCode = cleanVoucher($('#voucherCode')?.value || '') || null;
         const tx = el.dataset.tx || null;
+        const paidAmount = Number(el.dataset.displayAmount || rec.amount || 0);
         const common = {
           image_url: rec.image_url,
           link: rec.link,
           wallet: rec.wallet,
-          amount: rec.amount,
-          display_amount: Number(el.dataset.displayAmount || rec.amount || 0),
+          amount: Number(rec.amount || paidAmount || 0),
+          display_amount: paidAmount,
           x: rec.x, y: rec.y, w: rec.w, h: rec.h,
           name: rec.name,
           locked: true
         };
         const commonNoDisplay = { ...common }; delete commonNoDisplay.display_amount;
         const tries = [
-          { ...common, voucher_code: voucherCode, tx_signature: tx, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent },
-          { ...commonNoDisplay, voucher_code: voucherCode, tx_signature: tx, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent },
+          { ...common, voucher_code: voucherCode, tx_signature: tx, is_deleted:false, deleted:false },
+          { ...commonNoDisplay, voucher_code: voucherCode, tx_signature: tx },
           { ...commonNoDisplay, voucher_code: voucherCode, tx_signature: tx },
           { ...commonNoDisplay }
         ];
@@ -711,10 +736,17 @@
           return true;
         } else {
           console.error('Supabase ad save failed after retries:', lastError);
+          // Keep paid/voucher ad safely stored on this device and retry syncing later.
+          const pending = getPendingPaidAds().filter(a => (a.tx_signature || a.image_url) !== (tries[0].tx_signature || tries[0].image_url));
+          pending.push(tries[0]);
+          setPendingPaidAds(pending);
           return false;
         }
       }catch(e){
         console.warn('Supabase ad save failed, local save still kept:', e);
+        const pending = getPendingPaidAds().filter(a => (a.tx_signature || a.image_url) !== ((el.dataset.tx || null) || rec.image_url));
+        pending.push({ image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, display_amount: Number(el.dataset.displayAmount || rec.amount || 0), x: rec.x, y: rec.y, w: rec.w, h: rec.h, name: rec.name, locked: true, voucher_code: voucherCode, tx_signature: el.dataset.tx || null });
+        setPendingPaidAds(pending);
         return false;
       }
     }
@@ -726,6 +758,7 @@
   async function loadDeployedAds(){
     if(loadAdsBusy) return;
     loadAdsBusy = true;
+    await retryPendingPaidAds();
     let rows = [];
     let loadedFromSupabase = false;
     if(supa){
@@ -736,10 +769,13 @@
       }catch(e){ console.warn('Supabase ad load failed, using local fallback:', e); }
     }
 
-    // Supabase is the source of truth across devices. Local is only an offline fallback.
+    // Supabase is the source of truth across devices. Local/pending is only an emergency fallback
+    // so a paid ad is never hidden if the save retry is still pending.
     if(!loadedFromSupabase){
       rows = getLocalAds();
     }
+    const pendingRows = getPendingPaidAds();
+    if(pendingRows.length) rows = rows.concat(pendingRows);
 
     const adKey = (r) => String(r.id || r.tx_signature || ((r.image_url||'') + '|' + (r.name||'') + '|' + (r.amount||'')));
     const dedupedRows = [];
@@ -1170,8 +1206,11 @@
     const visualAmount = Number(p.price || 0);
     const paidAmountToSave = voucher ? 0 : visualAmount;
     console.log('PAYMENT OK, SAVING AD...', { paymentSignature, price:p.price, voucher });
-    await saveDeployedAd(deployedAd, paidAmountToSave);
-    console.log('AD SAVE STEP FINISHED');
+    const savedToSupabase = await saveDeployedAd(deployedAd, paidAmountToSave);
+    console.log('AD SAVE STEP FINISHED', { savedToSupabase });
+    if(!savedToSupabase && (paymentSignature || voucher)){
+      alert('Ad is placed on this device, but it did NOT sync to Supabase yet. Keep this browser open and refresh once. It will retry automatically. TX: ' + (paymentSignature || 'voucher'));
+    }
     $('#voucherCode').value = '';
     announce(name, visualAmount); impact(visualAmount);
     await loadDeployedAds();
@@ -1226,14 +1265,14 @@
         const img = new Image();
         img.onload = () => {
           try{
-            const max = 900;
+            const max = 600;
             const scale = Math.min(1, max / Math.max(img.width, img.height));
             const canvas = document.createElement('canvas');
             canvas.width = Math.max(1, Math.round(img.width * scale));
             canvas.height = Math.max(1, Math.round(img.height * scale));
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.72));
+            resolve(canvas.toDataURL('image/jpeg', 0.55));
           }catch(_e){ resolve(reader.result); }
         };
         img.onerror = () => resolve(reader.result);
