@@ -210,6 +210,52 @@
     const n = cleanNickname(nick || warNickname);
     return n || shortWallet(w || wallet);
   }
+  function nicknameLockKey(){ return wallet ? ('jakwo_war_nickname_locked_' + wallet) : 'jakwo_war_nickname_locked'; }
+  function isNicknameLocked(){ return !!cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname')) && localStorage.getItem(nicknameLockKey()) === '1'; }
+  async function loadLockedNickname(){
+    if(!wallet) return '';
+    let n = cleanNickname(localStorage.getItem('jakwo_war_nickname'));
+    if(supa){
+      try{
+        const { data, error } = await supa.from('war_chat_names').select('nickname').eq('wallet', wallet).maybeSingle();
+        if(!error && data && data.nickname) n = cleanNickname(data.nickname);
+      }catch(_e){}
+      if(!n){
+        try{
+          const { data, error } = await supa.from('chat_messages').select('nickname').eq('wallet', shortWallet(wallet)).not('nickname','is',null).limit(1);
+          if(!error && data && data[0] && data[0].nickname) n = cleanNickname(data[0].nickname);
+        }catch(_e){}
+      }
+    }
+    if(n){
+      warNickname = n;
+      localStorage.setItem('jakwo_war_nickname', n);
+      localStorage.setItem(nicknameLockKey(), '1');
+    }
+    return n;
+  }
+  async function saveLockedNickname(n){
+    n = cleanNickname(n);
+    if(!wallet || !n) return false;
+    if(isNicknameLocked()) return false;
+    if(supa){
+      const { error } = await supa.from('war_chat_names').insert({ wallet, nickname:n });
+      if(error && !/duplicate key|23505/i.test(String(error.message || error.code || ''))) throw error;
+      if(error) return false;
+    }
+    warNickname = n;
+    localStorage.setItem('jakwo_war_nickname', n);
+    localStorage.setItem(nicknameLockKey(), '1');
+    return true;
+  }
+  function lockNicknameUI(nickInput, nickSave){
+    const n = cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname'));
+    if(nickInput) nickInput.value = n;
+    if(isNicknameLocked()){
+      if(nickInput){ nickInput.disabled = true; nickInput.title = 'Nickname locked forever for this wallet'; }
+      if(nickSave){ nickSave.disabled = true; nickSave.textContent = 'LOCKED'; nickSave.title = 'Nickname locked forever for this wallet'; }
+    }
+  }
   function ensureNickname(){
     if(!wallet) return '';
     let n = cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname'));
@@ -222,6 +268,7 @@
     if(n){
       warNickname = n;
       localStorage.setItem('jakwo_war_nickname', n);
+      if(wallet) localStorage.setItem(nicknameLockKey(), '1');
     }
     return n;
   }
@@ -356,15 +403,22 @@
       const nickInput = panel.querySelector('#nicknameInput');
       const nickSave = panel.querySelector('#nicknameSave');
       const messages = panel.querySelector('#chatMessages');
-      if(nickInput) nickInput.value = cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname'));
+      loadLockedNickname().then(() => lockNicknameUI(nickInput, nickSave));
       if(nickSave){
-        nickSave.addEventListener('click', () => {
+        nickSave.addEventListener('click', async () => {
           if(!wallet){ alert('Connect wallet first.'); return; }
+          if(isNicknameLocked()){ alert('Nickname already locked for this wallet.'); return; }
           const n = cleanNickname(nickInput && nickInput.value);
           if(!n){ alert('Nickname must use letters, numbers, or underscore.'); return; }
-          warNickname = n;
-          localStorage.setItem('jakwo_war_nickname', n);
-          alert('Nickname saved: ' + n);
+          try{
+            const ok = await saveLockedNickname(n);
+            if(!ok){ alert('Nickname already locked for this wallet.'); }
+            else { alert('Nickname locked forever: ' + n); }
+          }catch(e){
+            console.warn('Nickname save failed:', e);
+            alert('Nickname save failed. Run WAR_CHAT_NICKNAME_SQL.sql in Supabase, then try again.');
+          }
+          lockNicknameUI(nickInput, nickSave);
           renderChat();
         });
       }
@@ -391,14 +445,21 @@
         const text = (input.value || '').trim();
         if(!text) return;
         if(/https?:\/\/|www\.|t\.me|discord\.gg/i.test(text)){ alert('No links allowed in war chat.'); return; }
-        let nick = cleanNickname((nickInput && nickInput.value) || warNickname || localStorage.getItem('jakwo_war_nickname'));
-        if(nick){
-          warNickname = nick;
-          localStorage.setItem('jakwo_war_nickname', nick);
-        } else {
-          nick = ensureNickname();
-          if(nickInput) nickInput.value = nick;
+        await loadLockedNickname();
+        let nick = cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname'));
+        if(!nick){
+          nick = cleanNickname(nickInput && nickInput.value);
+          if(nick){
+            try{ await saveLockedNickname(nick); }
+            catch(e){ console.warn('Nickname lock save failed:', e); nick = ''; }
+          }
         }
+        if(!nick){
+          alert('Choose and save your nickname first.');
+          return;
+        }
+        if(nickInput) nickInput.value = nick;
+        lockNicknameUI(nickInput, nickSave);
         const row = { wallet: shortWallet(wallet), nickname: nick, text: text.slice(0,160), at: Date.now() };
         if(supa){
           try{
@@ -979,7 +1040,7 @@
         return;
       }
       localStorage.setItem('jakwo_wallet', wallet);
-      ensureNickname();
+      await loadLockedNickname();
       updateWallet();
     }catch(e){
       console.warn('Wallet connect failed:', e);
