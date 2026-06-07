@@ -1238,21 +1238,27 @@
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => {
+        const originalDataUrl = reader.result;
         const img = new Image();
         img.onload = () => {
           try{
-            const max = 600;
+            // Keep war photos sharp for big placements. Only downscale very huge files.
+            const max = 2400;
             const scale = Math.min(1, max / Math.max(img.width, img.height));
             const canvas = document.createElement('canvas');
             canvas.width = Math.max(1, Math.round(img.width * scale));
             canvas.height = Math.max(1, Math.round(img.height * scale));
             const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.55));
-          }catch(_e){ resolve(reader.result); }
+            const highQuality = canvas.toDataURL('image/jpeg', 0.92);
+            // If the original is already small enough, keep it untouched.
+            resolve(String(originalDataUrl).length <= 1800000 ? originalDataUrl : highQuality);
+          }catch(_e){ resolve(originalDataUrl); }
         };
-        img.onerror = () => resolve(reader.result);
-        img.src = reader.result;
+        img.onerror = () => resolve(originalDataUrl);
+        img.src = originalDataUrl;
       };
       reader.readAsDataURL(file);
     });
