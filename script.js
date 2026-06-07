@@ -748,7 +748,7 @@
       const key = adKey(r);
       if(key && !seen.has(key)){ dedupedRows.push(r); seen.add(key); }
     }
-    rows = dedupedRows.filter(r => !r.deleted && !r.is_deleted);
+    rows = dedupedRows.filter(r => r && r.deleted !== true && r.is_deleted !== true && String(r.deleted).toLowerCase() !== 'true' && String(r.is_deleted).toLowerCase() !== 'true' && !r.deleted_at);
     maybeLockdownFromRows(rows);
 
     const json = JSON.stringify(rows.map(r => [r.id, r.tx_signature, r.created_at, r.x, r.y, r.w, r.h, r.x_percent, r.y_percent, r.w_percent, r.h_percent, r.amount, r.display_amount, r.name]));

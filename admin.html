@@ -143,21 +143,57 @@ async function deleteAd(id){
   if(!id)return alert('Missing ad id.');
   const reason=prompt('Type DELETE to remove this spam / wallet-drainer / rule-violating ad:');
   if(reason!=='DELETE')return;
-  if(supa){
-    // First try real delete. If Supabase RLS blocks it, try soft delete as backup.
-    let {error}=await supa.from('ads').delete().eq('id',id);
-    if(error){
-      const upd=await supa.from('ads').update({deleted:true, is_deleted:true, deleted_at:new Date().toISOString()}).eq('id',id);
-      if(upd.error){
-        alert('Delete failed. Run the updated supabase-schema.sql once, then try again. Error: '+error.message+' / '+upd.error.message);
-        return;
-      }
-    }
-  }else{
-    const rows=JSON.parse(localStorage.getItem('jakwo_deployed_ads_v3_fresh')||'[]').filter(a=>String(a.id)!==String(id));
-    localStorage.setItem('jakwo_deployed_ads_v3_fresh',JSON.stringify(rows));
+
+  if(!supa){
+    alert('Admin is NOT connected to Supabase, so it cannot delete ads from the live arena. Deploy this zip first, then open https://YOUR-SITE/admin.html');
+    return;
   }
-  alert('Ad deleted from arena. Open/refresh the arena page to confirm.');
+
+  const {data:before,error:readErr}=await supa.from('ads').select('*').eq('id',id).maybeSingle();
+  if(readErr){
+    alert('Cannot read this ad from Supabase. Run supabase-schema.sql, then try again. Error: '+readErr.message);
+    return;
+  }
+  if(!before){
+    alert('This ad is already gone from Supabase. Refresh the arena page.');
+    await renderAds();
+    return;
+  }
+
+  const now=new Date().toISOString();
+  let errors=[];
+
+  // 1) Best fix: hard delete from Supabase.
+  let del=await supa.from('ads').delete().eq('id',id).select('id');
+  if(del.error) errors.push('hard delete: '+del.error.message);
+
+  // 2) Backup: soft delete by ID so arena hides it even if hard delete is blocked.
+  let upd=await supa.from('ads')
+    .update({deleted:true,is_deleted:true,deleted_at:now})
+    .eq('id',id)
+    .select('id,deleted,is_deleted');
+  if(upd.error) errors.push('soft delete id: '+upd.error.message);
+
+  // 3) Extra backup: some old rows were saved without matching ID, so mark by same link/wallet/image/name.
+  let q=supa.from('ads').update({deleted:true,is_deleted:true,deleted_at:now});
+  if(before.link) q=q.eq('link',before.link);
+  else if(before.image_url) q=q.eq('image_url',before.image_url);
+  else q=q.eq('name',before.name||'');
+  const upd2=await q.select('id,deleted,is_deleted');
+  if(upd2.error) errors.push('soft delete fingerprint: '+upd2.error.message);
+
+  // Verify. Do NOT show success if Supabase did not really change the live data.
+  const check=await supa.from('ads').select('id,deleted,is_deleted').eq('id',id).maybeSingle();
+  if(check.error){
+    alert('Delete verification failed: '+check.error.message+'\nRun supabase-schema.sql again, then try.');
+    return;
+  }
+  if(check.data && !check.data.deleted && !check.data.is_deleted){
+    alert('NOT DELETED from live arena. Supabase blocked the change. Run supabase-schema.sql in Supabase SQL Editor first. Details: '+(errors.join(' | ')||'no rows changed'));
+    return;
+  }
+
+  alert('Deleted from Supabase. Refresh the arena page now.');
   await renderAds();
 }
 </script>
