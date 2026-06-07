@@ -344,7 +344,7 @@
       rules: rulesHTML,
       story: storyHTML,
       leaderboard: leaderboardHTML(),
-      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet, choose a nickname, then troll. No links allowed in chat.</p><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
+      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet, choose a nickname, then troll. No links allowed in chat.</p><div class="chat-row"><input id="nicknameInput" class="wallet-required" placeholder="Nickname" maxlength="20"><button id="nicknameSave" class="chat-send wallet-required">SAVE</button></div><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
     };
     panel.dataset.type = type;
     panelContent.innerHTML = map[type] || '';
@@ -353,7 +353,21 @@
     if(type === 'chat'){
       const input = panel.querySelector('#chatInput');
       const send = panel.querySelector('#chatSend');
+      const nickInput = panel.querySelector('#nicknameInput');
+      const nickSave = panel.querySelector('#nicknameSave');
       const messages = panel.querySelector('#chatMessages');
+      if(nickInput) nickInput.value = cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname'));
+      if(nickSave){
+        nickSave.addEventListener('click', () => {
+          if(!wallet){ alert('Connect wallet first.'); return; }
+          const n = cleanNickname(nickInput && nickInput.value);
+          if(!n){ alert('Nickname must use letters, numbers, or underscore.'); return; }
+          warNickname = n;
+          localStorage.setItem('jakwo_war_nickname', n);
+          alert('Nickname saved: ' + n);
+          renderChat();
+        });
+      }
       const localChatRows = () => { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch(_e){ return []; } };
       const normalizeChat = (r) => ({ wallet: r.wallet || 'Anon', nickname: r.nickname || '', text: r.message || r.text || '', at: r.created_at || r.at || '' });
       const drawRows = (rows) => {
@@ -377,7 +391,14 @@
         const text = (input.value || '').trim();
         if(!text) return;
         if(/https?:\/\/|www\.|t\.me|discord\.gg/i.test(text)){ alert('No links allowed in war chat.'); return; }
-        const nick = ensureNickname();
+        let nick = cleanNickname((nickInput && nickInput.value) || warNickname || localStorage.getItem('jakwo_war_nickname'));
+        if(nick){
+          warNickname = nick;
+          localStorage.setItem('jakwo_war_nickname', nick);
+        } else {
+          nick = ensureNickname();
+          if(nickInput) nickInput.value = nick;
+        }
         const row = { wallet: shortWallet(wallet), nickname: nick, text: text.slice(0,160), at: Date.now() };
         if(supa){
           try{

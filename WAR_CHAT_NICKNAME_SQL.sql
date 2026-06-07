@@ -1,1 +1,2 @@
-alter table chat_messages add column if not exists nickname text;
+alter table chat_messages
+add column if not exists nickname text;
