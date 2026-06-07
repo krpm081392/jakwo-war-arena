@@ -251,10 +251,20 @@
   function lockNicknameUI(nickInput, nickSave){
     const n = cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname'));
     if(nickInput) nickInput.value = n;
+    const nickRow = document.getElementById('nicknameRow');
+    const nickLocked = document.getElementById('nicknameLocked');
     if(isNicknameLocked()){
-      if(nickInput){ nickInput.disabled = true; nickInput.title = 'Nickname locked forever for this wallet'; }
-      if(nickSave){ nickSave.disabled = true; nickSave.textContent = 'LOCKED'; nickSave.title = 'Nickname locked forever for this wallet'; }
+      if(nickRow) nickRow.style.display = 'none';
+      if(nickLocked){
+        nickLocked.style.display = 'block';
+        nickLocked.innerHTML = '<b>👑 WAR NAME</b><br>' + esc(n) + ' 🔒';
+      }
+      return;
     }
+    if(nickRow) nickRow.style.display = '';
+    if(nickLocked) nickLocked.style.display = 'none';
+    if(nickInput){ nickInput.disabled = false; nickInput.title = ''; }
+    if(nickSave){ nickSave.disabled = false; nickSave.textContent = 'SAVE'; nickSave.title = ''; }
   }
   function ensureNickname(){
     if(!wallet) return '';
@@ -391,7 +401,7 @@
       rules: rulesHTML,
       story: storyHTML,
       leaderboard: leaderboardHTML(),
-      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet, choose a nickname, then troll. No links allowed in chat.</p><div class="chat-row"><input id="nicknameInput" class="wallet-required" placeholder="Nickname" maxlength="20"><button id="nicknameSave" class="chat-send wallet-required">SAVE</button></div><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
+      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet, choose a nickname, then troll. No links allowed in chat.</p><div id="nicknameLocked" class="nickname-locked" style="display:none"></div><div id="nicknameRow" class="chat-row"><input id="nicknameInput" class="wallet-required" placeholder="Nickname" maxlength="20"><button id="nicknameSave" class="chat-send wallet-required">SAVE</button></div><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
     };
     panel.dataset.type = type;
     panelContent.innerHTML = map[type] || '';

@@ -599,3 +599,13 @@ body.effect-static .ad.locked:after{content:'';position:absolute;inset:0;pointer
 .lockdown-active #lockdownBanner{
   background:radial-gradient(circle at center, rgba(160,0,0,.22), rgba(0,0,0,.38) 55%, rgba(0,0,0,.50))!important;
 }
+.nickname-locked{
+  background:#fff0c8;
+  border:2px solid #7a2a0d;
+  border-radius:8px;
+  padding:8px 10px;
+  margin:6px 0;
+  font-weight:900;
+  color:#2b0d00;
+  text-align:center;
+}
