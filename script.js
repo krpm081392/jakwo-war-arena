@@ -455,11 +455,26 @@
     const sec = String(total%60).padStart(2,'0');
     return h > 0 ? `${h}:${m}:${sec}` : `${m}:${sec}`;
   }
+  function positionLockdownBanner(){
+    const el = $('#lockdownBanner');
+    if(!el) return;
+    const vv = window.visualViewport;
+    const left = (vv ? vv.pageLeft : window.scrollX) || 0;
+    const top = (vv ? vv.pageTop : window.scrollY) || 0;
+    const width = (vv ? vv.width : window.innerWidth) || document.documentElement.clientWidth || 0;
+    const height = (vv ? vv.height : window.innerHeight) || document.documentElement.clientHeight || 0;
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+    el.style.width = width + 'px';
+    el.style.height = height + 'px';
+  }
+
   function updateLockdownUI(){
     const until = getLockUntil();
     const left = until - Date.now();
     const banner = ensureLockdownBanner();
     const active = left > 0;
+    positionLockdownBanner();
     banner.classList.toggle('show', active);
     banner.setAttribute('aria-hidden', active ? 'false' : 'true');
     document.body.classList.toggle('lockdown-active', active);
@@ -469,6 +484,12 @@
     if(!active && lockdownTimerHandle){ clearInterval(lockdownTimerHandle); lockdownTimerHandle=null; }
     if(active && !lockdownSirenHandle){ playLockdownSiren(); lockdownSirenHandle = setInterval(playLockdownSiren, 2600); }
     if(!active && lockdownSirenHandle){ clearInterval(lockdownSirenHandle); lockdownSirenHandle=null; }
+  }
+  window.addEventListener('scroll', positionLockdownBanner, {passive:true});
+  window.addEventListener('resize', positionLockdownBanner, {passive:true});
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('scroll', positionLockdownBanner, {passive:true});
+    window.visualViewport.addEventListener('resize', positionLockdownBanner, {passive:true});
   }
   function triggerLockdown(){
     const until = Date.now() + 60*60*1000;

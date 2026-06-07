@@ -565,3 +565,37 @@ body.effect-crack .ad.locked:after{content:'';position:absolute;inset:0;pointer-
 body.effect-static .ad.locked:after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.2) 0 2px,transparent 2px 4px);animation:staticNoise .8s steps(8,end);}
 @keyframes adShake{0%,100%{transform:translate(0)}10%{transform:translate(-8px,5px)}25%{transform:translate(7px,-5px)}40%{transform:translate(-9px,-4px)}65%{transform:translate(6px,6px)}}
 @keyframes adFall{0%,100%{transform:translateY(0) rotate(0)}45%{transform:translateY(18px) rotate(-4deg)}70%{transform:translateY(-8px) rotate(2deg)}}
+
+
+/* 1M lockdown viewport-center fix: keeps warning/countdown centered even when arena is horizontally zoomed/scrolled */
+#lockdownBanner{
+  position:absolute!important;
+  inset:auto!important;
+  left:0;
+  top:0;
+  width:100vw;
+  height:100vh;
+  transform:none!important;
+  box-sizing:border-box!important;
+}
+#lockdownBanner.show,.lockdown-active #lockdownBanner{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+/* LOCKDOWN CLICK-THROUGH FIX: block new placements, but keep existing paid ads clickable */
+#lockdownBanner,
+#lockdownBanner *{
+  pointer-events:none!important;
+}
+.lockdown-active .arena:after{
+  pointer-events:none!important;
+}
+.lockdown-active .ad.locked,
+.lockdown-active .ad.locked img{
+  pointer-events:auto!important;
+}
+.lockdown-active #lockdownBanner{
+  background:radial-gradient(circle at center, rgba(160,0,0,.22), rgba(0,0,0,.38) 55%, rgba(0,0,0,.50))!important;
+}
