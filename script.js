@@ -290,13 +290,16 @@
     if(Number.isInteger(n)) return String(n);
     return n.toFixed(2).replace(/\.00$/,'').replace(/(\.\d*?)0+$/,'$1');
   }
+  function setText(id, value){ const el = $(id); if(el) el.textContent = value; }
   function updatePrice(){
     const p = currentAd ? priceFor(currentAd) : {coverage:.00005, price:.5};
     const vv = currentAd ? activeVoucherValue() : 0;
     const displayPrice = Math.max(0.5, Math.min(1000000, vv || p.price || 0.5));
-    $('#costText').textContent = `${displayPrice.toFixed(2)} USDC`;
-    $('#coverageText').textContent = `${p.coverage < 0.01 ? p.coverage.toFixed(5) : p.coverage.toFixed(2)}%`;
-    $('#sheetPrice').textContent = `${displayPrice.toFixed(2)} USDC`;
+    setText('#costText', `${displayPrice.toFixed(2)} USDC`);
+    setText('#liveCost', `${displayPrice.toFixed(2)} USDC`);
+    setText('#coverageText', `${p.coverage < 0.01 ? p.coverage.toFixed(5) : p.coverage.toFixed(2)}%`);
+    setText('#sheetPrice', `${displayPrice.toFixed(2)} USDC`);
+    setText('#priceText', `${displayPrice.toFixed(2)} USDC`);
     const bi = $('#budgetInput');
     if(currentAd && bi && document.activeElement !== bi){
       // When user drags/resizes the ad, keep the budget/price input synced.
@@ -304,6 +307,8 @@
     }
   }
   function openSheet(){
+    updateLockdownUI();
+    if(getLockUntil() > Date.now()){ alert('☢ Arena is in $1M lockdown. Wait for the 1-hour hazard timer to finish.'); return; }
     if(sheet.classList.contains('open')){ closeSheet(); return; }
     closePanel();
     sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false');
@@ -382,6 +387,69 @@
     }
   }
   function closePanel(){ panel.classList.add('hidden'); }
+  const LOCK_KEY = 'jakwo_1m_lockdown_until';
+  let lockdownTimerHandle = null;
+  function ensureLockdownBanner(){
+    let el = $('#lockdownBanner');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'lockdownBanner';
+      el.innerHTML = `<div class="lock-icon">☢</div><div><b>HAZARD LOCKDOWN ACTIVE</b><span id="lockdownTimer">60:00</span><small>$1,000,000 WAR AD bought — arena deploy is locked for 1 hour.</small></div>`;
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function getLockUntil(){ return Number(localStorage.getItem(LOCK_KEY) || 0); }
+  function setLockUntil(ts){ localStorage.setItem(LOCK_KEY, String(ts)); updateLockdownUI(); }
+  function formatCountdown(ms){
+    const total = Math.max(0, Math.ceil(ms/1000));
+    const m = String(Math.floor(total/60)).padStart(2,'0');
+    const sec = String(total%60).padStart(2,'0');
+    return `${m}:${sec}`;
+  }
+  function updateLockdownUI(){
+    const until = getLockUntil();
+    const left = until - Date.now();
+    const banner = ensureLockdownBanner();
+    const active = left > 0;
+    banner.classList.toggle('show', active);
+    document.body.classList.toggle('lockdown-active', active);
+    const timer = $('#lockdownTimer'); if(timer) timer.textContent = formatCountdown(left);
+    ['#deployBtn','#addBtn','#mobileAddBtn'].forEach(sel=>{ const b=$(sel); if(b) b.disabled = active; });
+    if(active && !lockdownTimerHandle){ lockdownTimerHandle = setInterval(updateLockdownUI, 1000); }
+    if(!active && lockdownTimerHandle){ clearInterval(lockdownTimerHandle); lockdownTimerHandle=null; }
+  }
+  function triggerLockdown(){
+    const until = Date.now() + 60*60*1000;
+    setLockUntil(Math.max(getLockUntil(), until));
+  }
+  function maybeLockdownFromRows(rows){
+    let until = getLockUntil();
+    (rows || []).forEach(r=>{
+      const a = Math.max(Number(r.amount||0), Number(r.display_amount||0));
+      if(a >= 1000000){
+        const t = r.created_at ? new Date(r.created_at).getTime() : Date.now();
+        if(Number.isFinite(t)) until = Math.max(until, t + 60*60*1000);
+      }
+    });
+    if(until > getLockUntil()) setLockUntil(until); else updateLockdownUI();
+  }
+  function visualEffectClass(amount){
+    const a = Number(amount || 0);
+    if(a >= 1000000) return 'effect-lockdown';
+    if(a >= 900000) return 'effect-meteor';
+    if(a >= 800000) return 'effect-nuke';
+    if(a >= 700000) return 'effect-red-alert';
+    if(a >= 600000) return 'effect-blackout';
+    if(a >= 500000) return 'effect-earthquake';
+    if(a >= 400000) return 'effect-fire';
+    if(a >= 300000) return 'effect-crack';
+    if(a >= 200000) return 'effect-fall';
+    if(a >= 100000) return 'effect-heavy-shake';
+    const low = ['effect-crack','effect-fall','effect-heavy-shake','effect-static','effect-dust'];
+    if(a >= 1000) return low[Math.floor(Math.random()*low.length)];
+    return 'effect-small-pop';
+  }
   function impact(amount=0){
     const flash = $('#impactFlash');
     let alertBox = $('#warAlert');
@@ -392,32 +460,41 @@
     }
     const a = Number(amount || 0);
     let text = '⚔ NEW WAR AD DEPLOYED';
-    let dur = 750;
-    if(a >= 1000000){ text = '🚨 TSUNAMI ALERT — ARENA DOMINATOR DEPLOYED'; dur = 1800; }
-    else if(a >= 10000){ text = '🚨 MAJOR WAR IMPACT'; dur = 1300; }
-    else if(a >= 1000){ text = '⚠ WAR IMPACT DETECTED'; dur = 1000; }
-    document.body.classList.add(a >= 1000000 ? 'mega-shake' : 'shake');
-    flash.classList.add(a >= 1000000 ? 'mega-flash' : 'flash');
+    let dur = 900;
+    if(a >= 1000000){ text = '☢ HAZARD ALERT — $1M ARENA LOCKDOWN STARTED: 1 HOUR'; dur = 4200; triggerLockdown(); }
+    else if(a >= 900000){ text = '☄ METEOR IMPACT — 900K WAR STRIKE'; dur = 2600; }
+    else if(a >= 800000){ text = '💥 NUKE WARNING — 800K WAR STRIKE'; dur = 2500; }
+    else if(a >= 700000){ text = '🚨 RED ALERT — 700K WAR STRIKE'; dur = 2300; }
+    else if(a >= 600000){ text = '⚫ BLACKOUT — 600K WAR STRIKE'; dur = 2200; }
+    else if(a >= 500000){ text = '🌋 EARTHQUAKE — 500K WAR STRIKE'; dur = 2100; }
+    else if(a >= 400000){ text = '🔥 FIRE STORM — 400K WAR STRIKE'; dur = 1900; }
+    else if(a >= 300000){ text = '裂 CRACKED ARENA — 300K WAR STRIKE'; dur = 1800; }
+    else if(a >= 200000){ text = '⬇ FIELD FALLING — 200K WAR STRIKE'; dur = 1700; }
+    else if(a >= 100000){ text = '⚠ HEAVY SHAKE — 100K WAR STRIKE'; dur = 1600; }
+    else if(a >= 1000){ text = '⚠ RANDOM WAR EFFECT TRIGGERED'; dur = 1300; }
+    const cls = visualEffectClass(a);
+    document.body.classList.add('war-effect', cls);
+    flash?.classList.add(a >= 1000000 ? 'mega-flash' : 'flash');
     alertBox.textContent = text;
-    alertBox.classList.add('show');
-    try{ if(navigator.vibrate) navigator.vibrate(a >= 1000000 ? [250,120,250,120,400] : [90,60,90]); }catch(_e){}
+    alertBox.className = 'show ' + cls;
+    try{ if(navigator.vibrate) navigator.vibrate(a >= 1000000 ? [350,140,350,140,600] : [110,70,110]); }catch(_e){}
     try{
       const AC = window.AudioContext || window.webkitAudioContext;
       if(AC){
         const ctx = new AC();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.value = a >= 1000000 ? 180 : 320;
-        gain.gain.value = 0.035;
+        osc.type = a >= 1000000 ? 'square' : 'sawtooth';
+        osc.frequency.value = a >= 1000000 ? 120 : 320;
+        gain.gain.value = 0.04;
         osc.connect(gain); gain.connect(ctx.destination); osc.start();
-        setTimeout(()=>{ try{osc.stop(); ctx.close();}catch(_e){} }, a >= 1000000 ? 450 : 180);
+        setTimeout(()=>{ try{osc.stop(); ctx.close();}catch(_e){} }, a >= 1000000 ? 900 : 250);
       }
     }catch(_e){}
     setTimeout(()=>{
-      document.body.classList.remove('shake','mega-shake');
-      flash.classList.remove('flash','mega-flash');
-      alertBox.classList.remove('show');
+      document.body.classList.remove('war-effect', cls);
+      flash?.classList.remove('flash','mega-flash');
+      alertBox.classList.remove('show', cls);
     }, dur);
   }
   function paidAmount(r){ return Math.max(0, Number(r?.amount || 0)); }
@@ -561,14 +638,17 @@
           link: rec.link,
           wallet: rec.wallet,
           amount: rec.amount,
+          display_amount: Number(el.dataset.displayAmount || rec.amount || 0),
           x: rec.x, y: rec.y, w: rec.w, h: rec.h,
           name: rec.name,
           locked: true
         };
+        const commonNoDisplay = { ...common }; delete commonNoDisplay.display_amount;
         const tries = [
           { ...common, voucher_code: voucherCode, tx_signature: tx, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent },
-          { ...common, voucher_code: voucherCode, tx_signature: tx },
-          { ...common }
+          { ...commonNoDisplay, voucher_code: voucherCode, tx_signature: tx, x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent },
+          { ...commonNoDisplay, voucher_code: voucherCode, tx_signature: tx },
+          { ...commonNoDisplay }
         ];
         let saved = false, lastError = null;
         for(const payload of tries){
@@ -622,8 +702,9 @@
       if(key && !seen.has(key)){ dedupedRows.push(r); seen.add(key); }
     }
     rows = dedupedRows;
+    maybeLockdownFromRows(rows);
 
-    const json = JSON.stringify(rows.map(r => [r.id, r.tx_signature, r.created_at, r.x, r.y, r.w, r.h, r.x_percent, r.y_percent, r.w_percent, r.h_percent, r.amount, r.name]));
+    const json = JSON.stringify(rows.map(r => [r.id, r.tx_signature, r.created_at, r.x, r.y, r.w, r.h, r.x_percent, r.y_percent, r.w_percent, r.h_percent, r.amount, r.display_amount, r.name]));
     if(json !== lastAdsJson){
       arena.querySelectorAll('.ad.locked').forEach(n => n.remove());
       rows.forEach(renderDeployedAd);
@@ -956,6 +1037,8 @@
   }
 
   async function deploy(){
+    updateLockdownUI();
+    if(getLockUntil() > Date.now()){ alert('☢ Arena is in $1M lockdown. Wait for the 1-hour hazard timer to finish.'); return; }
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
     if(!wallet){ alert('Connect wallet first.'); return; }
     const voucher = cleanVoucher($('#voucherCode').value);
@@ -1036,11 +1119,14 @@
       }
     }
     if(paymentSignature) deployedAd.dataset.tx = paymentSignature;
+    deployedAd.dataset.displayAmount = String(p.price || 0);
+    const visualAmount = Number(p.price || 0);
+    const paidAmountToSave = voucher ? 0 : visualAmount;
     console.log('PAYMENT OK, SAVING AD...', { paymentSignature, price:p.price, voucher });
-    await saveDeployedAd(deployedAd, voucher ? 0 : p.price);
+    await saveDeployedAd(deployedAd, paidAmountToSave);
     console.log('AD SAVE STEP FINISHED');
     $('#voucherCode').value = '';
-    announce(name, voucher ? 0 : p.price); impact(voucher ? 0 : p.price);
+    announce(name, visualAmount); impact(visualAmount);
     await loadDeployedAds();
     setTimeout(loadDeployedAds, 1200);
     closeSheet(); currentAd=null; updatePrice();
@@ -1144,20 +1230,38 @@
   function initMobileStageZoom(){
     const app = document.querySelector('.app');
     if(!app || !arena) return;
-    let scale = 1;
+    let scale = Number(arena.dataset.zoom || 1) || 1;
     let startDist = 0;
     let startScale = 1;
+    let startWorldX = 0;
+    let startWorldY = 0;
+    let focalX = 0;
+    let focalY = 0;
     const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
     const apply = ()=>{
       arena.style.transformOrigin = '0 0';
       arena.style.transform = `scale(${scale})`;
       arena.dataset.zoom = String(scale);
+      // Keep scrollable camera size matching the transformed battlefield.
+      arena.style.marginRight = Math.max(0, ARENA_WIDTH * (scale - 1)) + 'px';
+      arena.style.marginBottom = Math.max(0, ARENA_HEIGHT * (scale - 1)) + 'px';
     };
     const distance = (t1,t2)=>Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
+    const focalPoint = (touches)=>{
+      const r = app.getBoundingClientRect();
+      return {
+        x: ((touches[0].clientX + touches[1].clientX) / 2) - r.left,
+        y: ((touches[0].clientY + touches[1].clientY) / 2) - r.top
+      };
+    };
     app.addEventListener('touchstart', (e)=>{
       if(e.touches && e.touches.length === 2){
         startDist = distance(e.touches[0], e.touches[1]);
         startScale = scale;
+        const f = focalPoint(e.touches);
+        focalX = f.x; focalY = f.y;
+        startWorldX = (app.scrollLeft + focalX) / startScale;
+        startWorldY = (app.scrollTop + focalY) / startScale;
       }
     }, {passive:true});
     app.addEventListener('touchmove', (e)=>{
@@ -1167,13 +1271,26 @@
         if(startDist > 0){
           scale = clamp(startScale * (d / startDist), 0.65, 3);
           apply();
+          app.scrollLeft = Math.max(0, startWorldX * scale - focalX);
+          app.scrollTop = Math.max(0, startWorldY * scale - focalY);
         }
       }
     }, {passive:false});
+    // Buttons for desktop/phone testing if present.
+    document.querySelectorAll('.zoom-mini button').forEach((b,idx)=>{
+      b.addEventListener('click',()=>{
+        const old = scale;
+        scale = clamp(idx===0 ? scale/1.15 : scale*1.15, 0.65, 3);
+        const cx = app.clientWidth/2, cy = app.clientHeight/2;
+        const wx = (app.scrollLeft + cx) / old, wy = (app.scrollTop + cy) / old;
+        apply(); app.scrollLeft = wx*scale-cx; app.scrollTop = wy*scale-cy;
+      });
+    });
     apply();
   }
 
   initMobileStageZoom();
+  updateLockdownUI();
   loadDeployedAds(); setupAdsRealtime(); updateWallet(); renderStats(); updatePrice();
 })();
 
