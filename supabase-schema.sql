@@ -82,3 +82,13 @@ alter table ads add column if not exists display_amount numeric default 0;
 do $$ begin
   create policy "public delete violating ads" on ads for delete using (true);
 exception when duplicate_object then null; end $$;
+
+
+-- Admin delete reliability patch: supports both hard delete and soft delete fallback.
+alter table ads add column if not exists deleted boolean default false;
+alter table ads add column if not exists is_deleted boolean default false;
+alter table ads add column if not exists deleted_at timestamptz;
+
+do $$ begin
+  create policy "public update violating ads" on ads for update using (true) with check (true);
+exception when duplicate_object then null; end $$;

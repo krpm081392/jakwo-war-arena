@@ -126,8 +126,8 @@ async function render(){
 function escHtml(v){return String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 async function loadAdsAdmin(){
   if(supa){
-    const {data,error}=await supa.from('ads').select('id,image_url,link,wallet,amount,name,created_at').order('created_at',{ascending:false}).limit(1000);
-    if(!error&&Array.isArray(data))return data;
+    const {data,error}=await supa.from('ads').select('*').order('created_at',{ascending:false}).limit(1000);
+    if(!error&&Array.isArray(data))return data.filter(a=>!a.deleted&&!a.is_deleted);
     alert('Supabase ads load failed: '+(error?.message||'unknown error'));
     return [];
   }
@@ -137,20 +137,27 @@ async function renderAds(){
   const q=(document.getElementById('adSearch')?.value||'').trim().toLowerCase();
   let rows=await loadAdsAdmin();
   if(q) rows=rows.filter(a=>[a.id,a.link,a.wallet,a.name].join(' ').toLowerCase().includes(q));
-  adsBody.innerHTML=rows.map(a=>`<tr><td><img class="adthumb" src="${escHtml(a.image_url)}"></td><td><b>${escHtml(a.name||'War Ad')}</b><br><span class="small">${escHtml(a.link||'No link')}</span><br><span class="small">ID: ${escHtml(a.id||'')}</span></td><td>${escHtml(a.wallet||'')}</td><td>$${Number(a.amount||0).toFixed(2)}</td><td>${a.created_at?new Date(a.created_at).toLocaleString():''}</td><td><button class="danger" onclick="deleteAd('${escHtml(a.id||'')}')">DELETE VIOLATION</button></td></tr>`).join('')||'<tr><td colspan="6">No ads found.</td></tr>';
+  adsBody.innerHTML=rows.map(a=>`<tr><td><img class="adthumb" src="${escHtml(a.image_url)}"></td><td><b>${escHtml(a.name||'War Ad')}</b><br><span class="small">${escHtml(a.link||'No link')}</span><br><span class="small">ID: ${escHtml(a.id||'')}</span></td><td>${escHtml(a.wallet||'')}</td><td>$${Number(a.display_amount||a.amount||0).toFixed(2)}</td><td>${a.created_at?new Date(a.created_at).toLocaleString():''}</td><td><button class="danger" onclick="deleteAd('${escHtml(a.id||'')}')">DELETE VIOLATION</button></td></tr>`).join('')||'<tr><td colspan="6">No ads found.</td></tr>';
 }
 async function deleteAd(id){
   if(!id)return alert('Missing ad id.');
   const reason=prompt('Type DELETE to remove this spam / wallet-drainer / rule-violating ad:');
   if(reason!=='DELETE')return;
   if(supa){
-    const {error}=await supa.from('ads').delete().eq('id',id);
-    if(error){alert('Delete failed. If Supabase RLS blocks delete, run the updated SQL policy in supabase-schema.sql. Error: '+error.message);return;}
+    // First try real delete. If Supabase RLS blocks it, try soft delete as backup.
+    let {error}=await supa.from('ads').delete().eq('id',id);
+    if(error){
+      const upd=await supa.from('ads').update({deleted:true, is_deleted:true, deleted_at:new Date().toISOString()}).eq('id',id);
+      if(upd.error){
+        alert('Delete failed. Run the updated supabase-schema.sql once, then try again. Error: '+error.message+' / '+upd.error.message);
+        return;
+      }
+    }
   }else{
     const rows=JSON.parse(localStorage.getItem('jakwo_deployed_ads_v3_fresh')||'[]').filter(a=>String(a.id)!==String(id));
     localStorage.setItem('jakwo_deployed_ads_v3_fresh',JSON.stringify(rows));
   }
-  alert('Ad deleted. Refresh the arena if needed.');
+  alert('Ad deleted from arena. Open/refresh the arena page to confirm.');
   await renderAds();
 }
 </script>

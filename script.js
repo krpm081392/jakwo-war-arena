@@ -308,7 +308,7 @@
   }
   function openSheet(){
     updateLockdownUI();
-    if(getLockUntil() > Date.now()){ alert('☢ Arena is in $1M lockdown. Wait for the 1-hour hazard timer to finish.'); return; }
+    if(getLockUntil() > Date.now()){ alert('⚠️ WAR LOCKDOWN ACTIVE — No new ads can be placed until lockdown ends. Wait for the timer to finish.'); return; }
     if(sheet.classList.contains('open')){ closeSheet(); return; }
     closePanel();
     sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false');
@@ -389,12 +389,59 @@
   function closePanel(){ panel.classList.add('hidden'); }
   const LOCK_KEY = 'jakwo_1m_lockdown_until';
   let lockdownTimerHandle = null;
+  let lockdownSirenHandle = null;
+  let audioUnlocked = false;
+
+  function ensureAudioUnlocked(){
+    audioUnlocked = true;
+  }
+  ['pointerdown','touchstart','click','keydown'].forEach(evt => {
+    window.addEventListener(evt, ensureAudioUnlocked, { passive:true, once:false });
+  });
+
+  function playLockdownSiren(){
+    // Phone browsers only allow sound after the visitor taps/clicks the page once.
+    // After that, this makes a repeating hazard siren while lockdown is active.
+    if(!audioUnlocked) return;
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      const ctx = new AC();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.055;
+      gain.connect(ctx.destination);
+      const now = ctx.currentTime;
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      osc1.type = 'sawtooth';
+      osc2.type = 'square';
+      osc1.frequency.setValueAtTime(430, now);
+      osc1.frequency.linearRampToValueAtTime(820, now + 0.45);
+      osc1.frequency.linearRampToValueAtTime(430, now + 0.9);
+      osc2.frequency.setValueAtTime(215, now);
+      osc2.frequency.linearRampToValueAtTime(410, now + 0.45);
+      osc2.frequency.linearRampToValueAtTime(215, now + 0.9);
+      osc1.connect(gain); osc2.connect(gain);
+      osc1.start(now); osc2.start(now);
+      osc1.stop(now + 0.95); osc2.stop(now + 0.95);
+      setTimeout(()=>{ try{ ctx.close(); }catch(_e){} }, 1150);
+    }catch(_e){}
+  }
+
   function ensureLockdownBanner(){
     let el = $('#lockdownBanner');
     if(!el){
       el = document.createElement('div');
       el.id = 'lockdownBanner';
-      el.innerHTML = `<div class="lock-icon">☢</div><div><b>HAZARD LOCKDOWN ACTIVE</b><span id="lockdownTimer">60:00</span><small>$1,000,000 WAR AD bought — arena deploy is locked for 1 hour.</small></div>`;
+      el.innerHTML = `
+        <div class="lockdown-frame">
+          <div class="lockdown-siren">🚨</div>
+          <div class="lockdown-title">⚠️ WAR LOCKDOWN ACTIVE ⚠️</div>
+          <div class="lockdown-subtitle">$1,000,000 WAR AD HAS BEEN DEPLOYED</div>
+          <div id="lockdownTimer" class="lockdown-count">60:00</div>
+          <div class="lockdown-message">No new ads can be placed until lockdown ends.</div>
+          <div class="lockdown-small">Arena reopens automatically when the countdown reaches 00:00.</div>
+        </div>`;
       document.body.appendChild(el);
     }
     return el;
@@ -403,9 +450,10 @@
   function setLockUntil(ts){ localStorage.setItem(LOCK_KEY, String(ts)); updateLockdownUI(); }
   function formatCountdown(ms){
     const total = Math.max(0, Math.ceil(ms/1000));
-    const m = String(Math.floor(total/60)).padStart(2,'0');
+    const h = Math.floor(total/3600);
+    const m = String(Math.floor((total%3600)/60)).padStart(2,'0');
     const sec = String(total%60).padStart(2,'0');
-    return `${m}:${sec}`;
+    return h > 0 ? `${h}:${m}:${sec}` : `${m}:${sec}`;
   }
   function updateLockdownUI(){
     const until = getLockUntil();
@@ -413,15 +461,19 @@
     const banner = ensureLockdownBanner();
     const active = left > 0;
     banner.classList.toggle('show', active);
+    banner.setAttribute('aria-hidden', active ? 'false' : 'true');
     document.body.classList.toggle('lockdown-active', active);
     const timer = $('#lockdownTimer'); if(timer) timer.textContent = formatCountdown(left);
-    ['#deployBtn','#addBtn','#mobileAddBtn'].forEach(sel=>{ const b=$(sel); if(b) b.disabled = active; });
+    ['#deployBtn','#addBtn','#mobileAddBtn','#connectBtn'].forEach(sel=>{ const b=$(sel); if(b) b.disabled = active; });
     if(active && !lockdownTimerHandle){ lockdownTimerHandle = setInterval(updateLockdownUI, 1000); }
     if(!active && lockdownTimerHandle){ clearInterval(lockdownTimerHandle); lockdownTimerHandle=null; }
+    if(active && !lockdownSirenHandle){ playLockdownSiren(); lockdownSirenHandle = setInterval(playLockdownSiren, 2600); }
+    if(!active && lockdownSirenHandle){ clearInterval(lockdownSirenHandle); lockdownSirenHandle=null; }
   }
   function triggerLockdown(){
     const until = Date.now() + 60*60*1000;
     setLockUntil(Math.max(getLockUntil(), until));
+    playLockdownSiren();
   }
   function maybeLockdownFromRows(rows){
     let until = getLockUntil();
@@ -452,31 +504,27 @@
   }
   function impact(amount=0){
     const flash = $('#impactFlash');
-    let alertBox = $('#warAlert');
-    if(!alertBox){
-      alertBox = document.createElement('div');
-      alertBox.id = 'warAlert';
-      document.body.appendChild(alertBox);
-    }
     const a = Number(amount || 0);
-    let text = '⚔ NEW WAR AD DEPLOYED';
-    let dur = 900;
-    if(a >= 1000000){ text = '☢ HAZARD ALERT — $1M ARENA LOCKDOWN STARTED: 1 HOUR'; dur = 4200; triggerLockdown(); }
-    else if(a >= 900000){ text = '☄ METEOR IMPACT — 900K WAR STRIKE'; dur = 2600; }
-    else if(a >= 800000){ text = '💥 NUKE WARNING — 800K WAR STRIKE'; dur = 2500; }
-    else if(a >= 700000){ text = '🚨 RED ALERT — 700K WAR STRIKE'; dur = 2300; }
-    else if(a >= 600000){ text = '⚫ BLACKOUT — 600K WAR STRIKE'; dur = 2200; }
-    else if(a >= 500000){ text = '🌋 EARTHQUAKE — 500K WAR STRIKE'; dur = 2100; }
-    else if(a >= 400000){ text = '🔥 FIRE STORM — 400K WAR STRIKE'; dur = 1900; }
-    else if(a >= 300000){ text = '裂 CRACKED ARENA — 300K WAR STRIKE'; dur = 1800; }
-    else if(a >= 200000){ text = '⬇ FIELD FALLING — 200K WAR STRIKE'; dur = 1700; }
-    else if(a >= 100000){ text = '⚠ HEAVY SHAKE — 100K WAR STRIKE'; dur = 1600; }
-    else if(a >= 1000){ text = '⚠ RANDOM WAR EFFECT TRIGGERED'; dur = 1300; }
     const cls = visualEffectClass(a);
+
     document.body.classList.add('war-effect', cls);
     flash?.classList.add(a >= 1000000 ? 'mega-flash' : 'flash');
-    alertBox.textContent = text;
-    alertBox.className = 'show ' + cls;
+
+    // Only $1M shows words because it must tell users the arena is locked.
+    // Normal paid attacks are visual only: shake/crack/fall/smoke/etc. No random text banner.
+    if(a >= 1000000){
+      let alertBox = $('#warAlert');
+      if(!alertBox){
+        alertBox = document.createElement('div');
+        alertBox.id = 'warAlert';
+        document.body.appendChild(alertBox);
+      }
+      alertBox.textContent = '🚨 WAR LOCKDOWN ACTIVE — NO NEW ADS CAN BE PLACED UNTIL LOCKDOWN ENDS';
+      alertBox.className = 'show effect-lockdown';
+      triggerLockdown();
+      setTimeout(()=>alertBox.classList.remove('show','effect-lockdown'), 5200);
+    }
+
     try{ if(navigator.vibrate) navigator.vibrate(a >= 1000000 ? [350,140,350,140,600] : [110,70,110]); }catch(_e){}
     try{
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -494,8 +542,7 @@
     setTimeout(()=>{
       document.body.classList.remove('war-effect', cls);
       flash?.classList.remove('flash','mega-flash');
-      alertBox.classList.remove('show', cls);
-    }, dur);
+    }, a >= 1000000 ? 5200 : 1400);
   }
   function paidAmount(r){ return Math.max(0, Number(r?.amount || 0)); }
   function adDisplayName(r){ return (r?.name || r?.ad_name || 'War Ad').toString().slice(0,40); }
@@ -701,7 +748,7 @@
       const key = adKey(r);
       if(key && !seen.has(key)){ dedupedRows.push(r); seen.add(key); }
     }
-    rows = dedupedRows;
+    rows = dedupedRows.filter(r => !r.deleted && !r.is_deleted);
     maybeLockdownFromRows(rows);
 
     const json = JSON.stringify(rows.map(r => [r.id, r.tx_signature, r.created_at, r.x, r.y, r.w, r.h, r.x_percent, r.y_percent, r.w_percent, r.h_percent, r.amount, r.display_amount, r.name]));
@@ -1038,7 +1085,7 @@
 
   async function deploy(){
     updateLockdownUI();
-    if(getLockUntil() > Date.now()){ alert('☢ Arena is in $1M lockdown. Wait for the 1-hour hazard timer to finish.'); return; }
+    if(getLockUntil() > Date.now()){ alert('⚠️ WAR LOCKDOWN ACTIVE — No new ads can be placed until lockdown ends. Wait for the timer to finish.'); return; }
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
     if(!wallet){ alert('Connect wallet first.'); return; }
     const voucher = cleanVoucher($('#voucherCode').value);
