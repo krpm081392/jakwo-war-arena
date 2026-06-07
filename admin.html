@@ -20,6 +20,9 @@
   .tierGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 18px}
   .tierCard{background:#130804;border:1px solid #6a4222;border-radius:10px;padding:12px;line-height:1.55;font-weight:800}
   .tierCard .left{font-size:26px;color:#28ff70}.tierCard small{color:#d2a963}.warn{color:#ffdf77;font-weight:900}.bad{color:#ff6767;font-weight:900}
+  .adminSection{margin-top:28px;padding-top:18px;border-top:2px solid #6a4222}
+  .adThumb{width:72px;height:52px;object-fit:cover;border:1px solid #d2a963;border-radius:6px;background:#130804}
+  .smallBtn{height:32px;font-size:12px;margin:2px 3px;padding:0 8px}.danger{background:#7d0c0c}.muted{color:#d2a963;font-size:12px}.linkCell{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   @media(max-width:800px){.summary,.tierGrid{grid-template-columns:1fr 1fr}.box{padding:14px}body{padding:10px}}
 </style>
 </head>
@@ -52,10 +55,103 @@
       <thead><tr><th>Code</th><th>Tier</th><th>Status</th><th>Used By</th><th>Used At</th></tr></thead>
       <tbody id="codes"></tbody>
     </table>
+
+    <div class="adminSection">
+      <h2>War Ad Management</h2>
+      <p class="muted">Use only for scam, malware, phishing, illegal content, copyright, or safety reports. Deleted ads are removed from the arena.</p>
+      <button onclick="loadAdsAdmin()">Refresh Ads</button>
+      <input id="adSearch" placeholder="Search wallet / name / link" oninput="drawAdsAdmin()">
+      <table>
+        <thead><tr><th>Image</th><th>Name</th><th>Amount</th><th>Wallet</th><th>Link</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="adRows"><tr><td colspan="7" class="muted">Login then click Refresh Ads.</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+let adminAds=[];
+function shortWallet(w){return w?String(w).slice(0,4)+'...'+String(w).slice(-4):''}
+function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+async function loadAdsAdmin(){
+  if(!supa){ adRows.innerHTML='<tr><td colspan="7" class="bad">Supabase not configured.</td></tr>'; return; }
+  const {data,error}=await supa.from('ads').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(error){ adRows.innerHTML=`<tr><td colspan="7" class="bad">Failed to load ads: ${esc(error.message)}</td></tr>`; return; }
+  adminAds=Array.isArray(data)?data:[];
+  drawAdsAdmin();
+}
+function drawAdsAdmin(){
+  const q=(document.getElementById('adSearch')?.value||'').toLowerCase().trim();
+  const rows=adminAds.filter(a=>!q || [a.name,a.wallet,a.link,a.tx_signature,a.voucher_code].some(v=>String(v||'').toLowerCase().includes(q)));
+  adRows.innerHTML=rows.length?rows.map(a=>`<tr>
+    <td>${a.image_url?`<img class="adThumb" src="${esc(a.image_url)}">`:''}</td>
+    <td>${esc(a.name||'Untitled')}</td>
+    <td>$${Number(a.amount||0).toLocaleString()}</td>
+    <td title="${esc(a.wallet||'')}">${esc(shortWallet(a.wallet))}</td>
+    <td class="linkCell" title="${esc(a.link||'')}">${esc(a.link||'')}</td>
+    <td>${a.created_at?new Date(a.created_at).toLocaleString():''}</td>
+    <td><button class="smallBtn danger" onclick="deleteAdAdmin('${a.id}')">Delete</button></td>
+  </tr>`).join(''):'<tr><td colspan="7" class="muted">No ads found.</td></tr>';
+}
+async function deleteAdAdmin(id){
+  const ad=adminAds.find(a=>String(a.id)===String(id));
+  if(!ad)return alert('Ad not found');
+  const reason=prompt('Reason for removing this ad? Example: scam / malware / phishing / illegal / copyright');
+  if(!reason)return;
+  const confirmText=prompt('Type DELETE to permanently remove this ad from the arena.');
+  if(confirmText!=='DELETE')return alert('Delete cancelled');
+  if(supa){
+    try{ await supa.from('admin_actions').insert({action:'delete_ad',ad_id:id,wallet:ad.wallet||'',reason,ad_name:ad.name||'',link:ad.link||''}); }catch(e){ console.warn('audit log failed',e); }
+    const {error}=await supa.from('ads').delete().eq('id',id);
+    if(error){ alert('Delete failed: '+error.message); return; }
+  }
+  adminAds=adminAds.filter(a=>String(a.id)!==String(id));
+  drawAdsAdmin();
+  alert('Ad removed from arena. Refresh public site to confirm.');
+}
+
+</script>
+<script src="config.js">
+let adminAds=[];
+function shortWallet(w){return w?String(w).slice(0,4)+'...'+String(w).slice(-4):''}
+function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+async function loadAdsAdmin(){
+  if(!supa){ adRows.innerHTML='<tr><td colspan="7" class="bad">Supabase not configured.</td></tr>'; return; }
+  const {data,error}=await supa.from('ads').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(error){ adRows.innerHTML=`<tr><td colspan="7" class="bad">Failed to load ads: ${esc(error.message)}</td></tr>`; return; }
+  adminAds=Array.isArray(data)?data:[];
+  drawAdsAdmin();
+}
+function drawAdsAdmin(){
+  const q=(document.getElementById('adSearch')?.value||'').toLowerCase().trim();
+  const rows=adminAds.filter(a=>!q || [a.name,a.wallet,a.link,a.tx_signature,a.voucher_code].some(v=>String(v||'').toLowerCase().includes(q)));
+  adRows.innerHTML=rows.length?rows.map(a=>`<tr>
+    <td>${a.image_url?`<img class="adThumb" src="${esc(a.image_url)}">`:''}</td>
+    <td>${esc(a.name||'Untitled')}</td>
+    <td>$${Number(a.amount||0).toLocaleString()}</td>
+    <td title="${esc(a.wallet||'')}">${esc(shortWallet(a.wallet))}</td>
+    <td class="linkCell" title="${esc(a.link||'')}">${esc(a.link||'')}</td>
+    <td>${a.created_at?new Date(a.created_at).toLocaleString():''}</td>
+    <td><button class="smallBtn danger" onclick="deleteAdAdmin('${a.id}')">Delete</button></td>
+  </tr>`).join(''):'<tr><td colspan="7" class="muted">No ads found.</td></tr>';
+}
+async function deleteAdAdmin(id){
+  const ad=adminAds.find(a=>String(a.id)===String(id));
+  if(!ad)return alert('Ad not found');
+  const reason=prompt('Reason for removing this ad? Example: scam / malware / phishing / illegal / copyright');
+  if(!reason)return;
+  const confirmText=prompt('Type DELETE to permanently remove this ad from the arena.');
+  if(confirmText!=='DELETE')return alert('Delete cancelled');
+  if(supa){
+    try{ await supa.from('admin_actions').insert({action:'delete_ad',ad_id:id,wallet:ad.wallet||'',reason,ad_name:ad.name||'',link:ad.link||''}); }catch(e){ console.warn('audit log failed',e); }
+    const {error}=await supa.from('ads').delete().eq('id',id);
+    if(error){ alert('Delete failed: '+error.message); return; }
+  }
+  adminAds=adminAds.filter(a=>String(a.id)!==String(id));
+  drawAdsAdmin();
+  alert('Ad removed from arena. Refresh public site to confirm.');
+}
+
+</script>
 <script>
 const cfg=window.JAKWO_CONFIG||{};
 const PASS=cfg.adminPassword||cfg.ADMIN_PASSWORD||'JAKWOADMIN2026';
@@ -111,6 +207,47 @@ async function render(){
   }).join('');
   codes.innerHTML=all.map(c=>{const st=c.disabled?'DISABLED':c.used?'USED':'UNUSED';const cls=c.disabled?'disabled':c.used?'used':'unused';return `<tr><td>${c.code}</td><td>$${c.tier}</td><td class="${cls}">${st}</td><td>${c.used_by||''}</td><td>${c.used_at?new Date(c.used_at).toLocaleString():''}</td></tr>`}).join('');
 }
+
+let adminAds=[];
+function shortWallet(w){return w?String(w).slice(0,4)+'...'+String(w).slice(-4):''}
+function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+async function loadAdsAdmin(){
+  if(!supa){ adRows.innerHTML='<tr><td colspan="7" class="bad">Supabase not configured.</td></tr>'; return; }
+  const {data,error}=await supa.from('ads').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(error){ adRows.innerHTML=`<tr><td colspan="7" class="bad">Failed to load ads: ${esc(error.message)}</td></tr>`; return; }
+  adminAds=Array.isArray(data)?data:[];
+  drawAdsAdmin();
+}
+function drawAdsAdmin(){
+  const q=(document.getElementById('adSearch')?.value||'').toLowerCase().trim();
+  const rows=adminAds.filter(a=>!q || [a.name,a.wallet,a.link,a.tx_signature,a.voucher_code].some(v=>String(v||'').toLowerCase().includes(q)));
+  adRows.innerHTML=rows.length?rows.map(a=>`<tr>
+    <td>${a.image_url?`<img class="adThumb" src="${esc(a.image_url)}">`:''}</td>
+    <td>${esc(a.name||'Untitled')}</td>
+    <td>$${Number(a.amount||0).toLocaleString()}</td>
+    <td title="${esc(a.wallet||'')}">${esc(shortWallet(a.wallet))}</td>
+    <td class="linkCell" title="${esc(a.link||'')}">${esc(a.link||'')}</td>
+    <td>${a.created_at?new Date(a.created_at).toLocaleString():''}</td>
+    <td><button class="smallBtn danger" onclick="deleteAdAdmin('${a.id}')">Delete</button></td>
+  </tr>`).join(''):'<tr><td colspan="7" class="muted">No ads found.</td></tr>';
+}
+async function deleteAdAdmin(id){
+  const ad=adminAds.find(a=>String(a.id)===String(id));
+  if(!ad)return alert('Ad not found');
+  const reason=prompt('Reason for removing this ad? Example: scam / malware / phishing / illegal / copyright');
+  if(!reason)return;
+  const confirmText=prompt('Type DELETE to permanently remove this ad from the arena.');
+  if(confirmText!=='DELETE')return alert('Delete cancelled');
+  if(supa){
+    try{ await supa.from('admin_actions').insert({action:'delete_ad',ad_id:id,wallet:ad.wallet||'',reason,ad_name:ad.name||'',link:ad.link||''}); }catch(e){ console.warn('audit log failed',e); }
+    const {error}=await supa.from('ads').delete().eq('id',id);
+    if(error){ alert('Delete failed: '+error.message); return; }
+  }
+  adminAds=adminAds.filter(a=>String(a.id)!==String(id));
+  drawAdsAdmin();
+  alert('Ad removed from arena. Refresh public site to confirm.');
+}
+
 </script>
 </body>
 </html>

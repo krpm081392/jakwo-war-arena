@@ -439,3 +439,38 @@ body.dragging-ad{cursor:grabbing!important;user-select:none!important;}
 .dragging-ad .ad.editing{
   transition:none !important;
 }
+
+
+/* JAKWO tiered war effects + 1M lockdown */
+body.effect-crack .arena{animation:crackPulse .9s ease-in-out;}
+body.effect-fall .arena{animation:fallTilt .9s ease-in-out;}
+body.effect-shake .arena, body.effect-mini .arena{animation:arenaQuickShake .65s linear;}
+body.effect-100k .arena{animation:redRaid 1.1s linear;}
+body.effect-200k .arena{animation:crackPulse 1.25s ease-in-out;}
+body.effect-300k .arena{animation:arenaQuickShake 1.35s linear;}
+body.effect-400k .arena{animation:fallTilt 1.35s ease-in-out;}
+body.effect-500k .arena{animation:shockwave 1.45s ease-in-out;}
+body.effect-600k .arena{animation:sirenGlow 1.6s linear;}
+body.effect-700k .arena{animation:burnFlash 1.6s linear;}
+body.effect-800k .arena{animation:megaQuakeArena 1.8s linear;}
+body.effect-900k .arena{animation:nearDominator 2s linear;}
+body.effect-dominator .arena{animation:dominatorArena 2.6s linear;}
+@keyframes arenaQuickShake{0%,100%{transform:translate3d(0,0,0)}20%{transform:translate3d(-7px,3px,0)}40%{transform:translate3d(5px,-4px,0)}60%{transform:translate3d(-4px,5px,0)}80%{transform:translate3d(4px,2px,0)}}
+@keyframes crackPulse{0%,100%{filter:none}35%{filter:contrast(1.35) brightness(.9);box-shadow:inset 0 0 0 7px rgba(95,25,15,.45), inset 0 0 120px rgba(0,0,0,.45)}}
+@keyframes fallTilt{0%,100%{transform:rotate(0deg) translateY(0)}35%{transform:rotate(-1.2deg) translateY(8px)}70%{transform:rotate(1deg) translateY(-4px)}}
+@keyframes redRaid{0%,100%{filter:none}25%,65%{filter:sepia(.6) saturate(2) hue-rotate(-20deg) brightness(.9)}}
+@keyframes shockwave{0%,100%{transform:scale(1)}35%{transform:scale(1.015);box-shadow:inset 0 0 160px rgba(255,255,255,.25), inset 0 0 90px rgba(150,30,20,.55)}}
+@keyframes sirenGlow{0%,100%{filter:none}20%,60%{filter:brightness(1.35) saturate(1.5)}40%,80%{filter:brightness(.75) sepia(.8)}}
+@keyframes burnFlash{0%,100%{filter:none}25%{filter:sepia(1) saturate(2.3) hue-rotate(-35deg) brightness(1.15)}60%{filter:brightness(.8)}}
+@keyframes megaQuakeArena{0%,100%{transform:translate3d(0,0,0)}10%{transform:translate3d(-14px,8px,0)}20%{transform:translate3d(12px,-9px,0)}30%{transform:translate3d(-10px,-7px,0)}40%{transform:translate3d(15px,10px,0)}55%{transform:translate3d(-8px,4px,0)}70%{transform:translate3d(6px,-5px,0)}}
+@keyframes nearDominator{0%,100%{transform:scale(1);filter:none}35%{transform:scale(1.02);filter:contrast(1.4) brightness(.8) saturate(1.8)}}
+@keyframes dominatorArena{0%,100%{transform:scale(1);filter:none}15%{transform:scale(1.025) rotate(-.4deg);filter:brightness(1.3) saturate(2)}30%{transform:scale(.99) rotate(.5deg);filter:brightness(.7) sepia(1)}55%{transform:scale(1.02);filter:contrast(1.6) saturate(2)}80%{transform:scale(1.005)}}
+#arenaLockOverlay{position:fixed;left:50%;top:122px;transform:translateX(-50%) scale(.95);z-index:260;opacity:0;pointer-events:none;transition:.2s;}
+#arenaLockOverlay.show{opacity:1;transform:translateX(-50%) scale(1);}
+.lock-card{background:linear-gradient(180deg,#b91513,#4a0705);color:#fff2c5;border:4px solid #ffd36f;border-radius:14px;box-shadow:0 0 35px rgba(255,0,0,.45),0 12px 35px rgba(0,0,0,.55);padding:14px 24px;text-align:center;font-weight:1000;min-width:min(620px,92vw);animation:lockPulse 1s infinite alternate;}
+.lock-title{font-size:24px;letter-spacing:1px;}
+.lock-sub{font-size:13px;margin-top:4px;}
+.lock-count{font-size:38px;color:#00ff66;text-shadow:0 2px 0 #051b09;margin-top:6px;}
+@keyframes lockPulse{from{filter:brightness(1)}to{filter:brightness(1.25)}}
+body.arena-locked #addBtn, body.arena-locked #mobileAddBtn, body.arena-locked #deployBtn{opacity:.45;filter:grayscale(.4);cursor:not-allowed;}
+@media(max-width:800px){#arenaLockOverlay{top:250px}.lock-card{padding:10px 12px}.lock-title{font-size:15px}.lock-count{font-size:28px}.lock-sub{font-size:11px}}

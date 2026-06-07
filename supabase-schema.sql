@@ -74,3 +74,28 @@ alter table ads add column if not exists x_percent numeric;
 alter table ads add column if not exists y_percent numeric;
 alter table ads add column if not exists w_percent numeric;
 alter table ads add column if not exists h_percent numeric;
+
+
+-- Admin moderation patch: allow hidden admin panel to remove unsafe ads and log the action.
+create table if not exists admin_actions (
+  id uuid primary key default gen_random_uuid(),
+  action text,
+  ad_id uuid,
+  wallet text,
+  reason text,
+  ad_name text,
+  link text,
+  created_at timestamptz default now()
+);
+
+alter table admin_actions enable row level security;
+
+do $$ begin
+  create policy "public insert admin actions" on admin_actions for insert with check (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "public read admin actions" on admin_actions for select using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "admin delete ads" on ads for delete using (true);
+exception when duplicate_object then null; end $$;
