@@ -544,7 +544,7 @@
       flash?.classList.remove('flash','mega-flash');
     }, a >= 1000000 ? 5200 : 1400);
   }
-  function paidAmount(r){ return Math.max(0, Number(r?.amount || 0)); }
+  function paidAmount(r){ return Math.max(0, Number(r?.display_amount ?? r?.amount ?? 0)); }
   function adDisplayName(r){ return (r?.name || r?.ad_name || 'War Ad').toString().slice(0,40); }
   function buildLiveFeed(rows){
     const latest10 = (rows || []).slice(-10).reverse();
@@ -1008,14 +1008,12 @@
       throw new Error('solanaWeb3 missing');
     }
     const web3 = window.solanaWeb3;
-    // Prefer public RPCs first. api.mainnet-beta.solana.com often returns 403/rate-limit on Vercel/browser.
+    // Keep payment flow clean: avoid blocked/free RPC endpoints that trigger scary Phantom/browser warnings.
     const configuredRpc = config.solanaRpc || config.NEXT_PUBLIC_SOLANA_RPC || '';
+    const blockedRpc = (u) => /ankr\.com|api\.mainnet-beta\.solana\.com|solana\.public-rpc\.com/i.test(String(u || ''));
     const rpcList = [
-      configuredRpc && !configuredRpc.includes('api.mainnet-beta.solana.com') ? configuredRpc : '',
-      'https://rpc.ankr.com/solana',
-      'https://solana-rpc.publicnode.com',
-      'https://solana.public-rpc.com',
-      configuredRpc && configuredRpc.includes('api.mainnet-beta.solana.com') ? configuredRpc : ''
+      configuredRpc && !blockedRpc(configuredRpc) ? configuredRpc : '',
+      'https://solana-rpc.publicnode.com'
     ].filter(Boolean);
     const receiverWallet = config.receiverWallet || config.NEXT_PUBLIC_RECEIVER_WALLET || '';
     if(!receiverWallet){
@@ -1056,19 +1054,8 @@
     const instructions = [];
     const receiverInfo = await connection.getAccountInfo(receiverAta);
     if(!receiverInfo){
-      instructions.push(new web3.TransactionInstruction({
-        programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-        keys: [
-          { pubkey: payer, isSigner: true, isWritable: true },
-          { pubkey: receiverAta, isSigner: false, isWritable: true },
-          { pubkey: receiver, isSigner: false, isWritable: false },
-          { pubkey: mint, isSigner: false, isWritable: false },
-          { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
-        ],
-        data: new Uint8Array([])
-      }));
+      alert('Receiver USDC account is missing. Open the receiver wallet once and add/receive USDC first, then try again.');
+      throw new Error('receiver USDC ATA missing');
     }
     const amountUnits = BigInt(Math.round(Number(amount) * 1_000_000));
     const data = new Uint8Array(10);
@@ -1098,23 +1085,12 @@
       const signed = await provider.signTransaction(tx);
       sig = await connection.sendRawTransaction(signed.serialize());
     }
-    // Do not lose the ad if Phantom already sent/paid but RPC confirmation expires.
-    // We still try to confirm, but if confirmation times out/BlockheightExceeded happens,
-    // deploy continues with the transaction signature so the buyer receives the ad.
+    // Keep this clean: after Phantom returns a signature, continue saving the paid ad.
+    // No extra signature-status polling, because some public RPCs return 403 and scare users.
     try{
       await connection.confirmTransaction({ signature: sig, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight }, 'confirmed');
     }catch(confirmErr){
-      console.warn('Payment was sent but confirmation failed/expired. Continuing deploy with signature:', sig, confirmErr);
-      // Best-effort status check across backup RPCs. If unavailable, still continue with signature.
-      for(const rpc of rpcList){
-        try{
-          const c = new web3.Connection(rpc, 'confirmed');
-          const st = await c.getSignatureStatuses([sig], { searchTransactionHistory:true });
-          const v = st && st.value && st.value[0];
-          if(v && v.err){ throw new Error('Transaction failed: ' + JSON.stringify(v.err)); }
-          if(v && (v.confirmationStatus === 'confirmed' || v.confirmationStatus === 'finalized')) break;
-        }catch(statusErr){ console.warn('Signature status check failed on RPC:', rpc, statusErr); }
-      }
+      console.warn('Payment was sent; confirmation check failed/expired. Continuing deploy with signature:', sig, confirmErr);
     }
     return sig;
   }
