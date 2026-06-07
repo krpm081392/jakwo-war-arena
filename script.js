@@ -257,7 +257,7 @@
       if(nickRow) nickRow.style.display = 'none';
       if(nickLocked){
         nickLocked.style.display = 'block';
-        nickLocked.innerHTML = '<b>👑 WAR NAME</b><br>' + esc(n) + ' 🔒';
+        nickLocked.innerHTML = '👑 ' + esc(n) + ' 🔒';
       }
       return;
     }
