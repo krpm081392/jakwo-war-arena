@@ -497,7 +497,9 @@
     playLockdownSiren();
   }
   function maybeLockdownFromRows(rows){
-    let until = getLockUntil();
+    // Lockdown is based only on existing $1M ads.
+    // If admin/Supabase reset removes all ads, clear the local browser timer too.
+    let until = 0;
     (rows || []).forEach(r=>{
       const a = Math.max(Number(r.amount||0), Number(r.display_amount||0));
       if(a >= 1000000){
@@ -505,7 +507,12 @@
         if(Number.isFinite(t)) until = Math.max(until, t + 60*60*1000);
       }
     });
-    if(until > getLockUntil()) setLockUntil(until); else updateLockdownUI();
+    if(until > Date.now()){
+      if(until !== getLockUntil()) setLockUntil(until); else updateLockdownUI();
+    }else{
+      if(getLockUntil()) localStorage.removeItem(LOCK_KEY);
+      updateLockdownUI();
+    }
   }
   function visualEffectClass(amount){
     const a = Number(amount || 0);

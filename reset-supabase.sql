@@ -12,4 +12,4 @@ delete from public.promo_claims;
 -- Reset lockdown/site state if your table exists.
 update public.site_settings
 set value = '0'
-where key in ('lockdown_end','lockdown_active');
+where key in ('lockdown_end','lockdown_active','lockdown_until');
