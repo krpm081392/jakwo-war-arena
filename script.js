@@ -13,6 +13,7 @@
   const MIN_PRICE = 0.50;
   const MAX_PRICE = 1000000;
   let wallet = localStorage.getItem('jakwo_wallet') || '';
+  let warNickname = localStorage.getItem('jakwo_war_nickname') || '';
   let currentAd = null;
   let stats = JSON.parse(localStorage.getItem('jakwo_stats_v3_fresh') || '{"total":0,"volume":0,"latest":"None","top":"None"}');
   let chatChannel = null;
@@ -202,6 +203,28 @@
     <h3>10. Final Rule</h3><p><b>Buy. Place. Block. Repeat.</b> Once your ad enters the arena, it lives there forever — visible or buried, but never removed.</p>`;
 
   function shortWallet(w){ return w ? w.slice(0,4) + '...' + w.slice(-4) : 'CONNECT'; }
+  function cleanNickname(v){
+    return String(v || '').trim().replace(/[^a-zA-Z0-9_]/g,'').slice(0,20);
+  }
+  function displayWarName(w, nick){
+    const n = cleanNickname(nick || warNickname);
+    return n || shortWallet(w || wallet);
+  }
+  function ensureNickname(){
+    if(!wallet) return '';
+    let n = cleanNickname(warNickname || localStorage.getItem('jakwo_war_nickname'));
+    while(!n){
+      const input = prompt('Choose your War Chat nickname (letters, numbers, underscore only):', shortWallet(wallet).replace(/\./g,''));
+      if(input === null) break;
+      n = cleanNickname(input);
+      if(!n) alert('Nickname must use letters, numbers, or underscore.');
+    }
+    if(n){
+      warNickname = n;
+      localStorage.setItem('jakwo_war_nickname', n);
+    }
+    return n;
+  }
   function updateWallet(){
     const btn = $('#connectBtn');
     btn.textContent = shortWallet(wallet);
@@ -321,7 +344,7 @@
       rules: rulesHTML,
       story: storyHTML,
       leaderboard: leaderboardHTML(),
-      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet to troll. No links allowed in chat.</p><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
+      chat: `<h2>💬 WAR CHAT</h2><p>Read free. Connect wallet, choose a nickname, then troll. No links allowed in chat.</p><div id="chatMessages" class="chat-messages"></div><div class="chat-row"><input id="chatInput" class="wallet-required" placeholder="Connect wallet to chat"><button id="chatSend" class="chat-send wallet-required">SEND</button></div>`
     };
     panel.dataset.type = type;
     panelContent.innerHTML = map[type] || '';
@@ -332,9 +355,9 @@
       const send = panel.querySelector('#chatSend');
       const messages = panel.querySelector('#chatMessages');
       const localChatRows = () => { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch(_e){ return []; } };
-      const normalizeChat = (r) => ({ wallet: r.wallet || 'Anon', text: r.message || r.text || '', at: r.created_at || r.at || '' });
+      const normalizeChat = (r) => ({ wallet: r.wallet || 'Anon', nickname: r.nickname || '', text: r.message || r.text || '', at: r.created_at || r.at || '' });
       const drawRows = (rows) => {
-        messages.innerHTML = rows.length ? rows.map(r => `<p><b>${esc(r.wallet)}</b>: ${esc(r.text)}</p>`).join('') : '<p><b>System:</b> Connect wallet to join the war chat.</p>';
+        messages.innerHTML = rows.length ? rows.map(r => `<p><b>${esc(displayWarName(r.wallet, r.nickname))}</b>: ${esc(r.text)}</p>`).join('') : '<p><b>System:</b> Connect wallet to join the war chat.</p>';
         messages.scrollTop = messages.scrollHeight;
       };
       const renderChat = async () => {
@@ -354,10 +377,15 @@
         const text = (input.value || '').trim();
         if(!text) return;
         if(/https?:\/\/|www\.|t\.me|discord\.gg/i.test(text)){ alert('No links allowed in war chat.'); return; }
-        const row = { wallet: shortWallet(wallet), text: text.slice(0,160), at: Date.now() };
+        const nick = ensureNickname();
+        const row = { wallet: shortWallet(wallet), nickname: nick, text: text.slice(0,160), at: Date.now() };
         if(supa){
           try{
-            const { error } = await supa.from('chat_messages').insert({ wallet: row.wallet, message: row.text });
+            let { error } = await supa.from('chat_messages').insert({ wallet: row.wallet, nickname: row.nickname, message: row.text });
+            if(error && /nickname/i.test(String(error.message || error.details || ''))){
+              const retry = await supa.from('chat_messages').insert({ wallet: row.nickname || row.wallet, message: row.text });
+              error = retry.error;
+            }
             if(error) throw error;
           }catch(e){
             console.warn('Supabase chat send failed, saving local fallback:', e);
@@ -930,6 +958,7 @@
         return;
       }
       localStorage.setItem('jakwo_wallet', wallet);
+      ensureNickname();
       updateWallet();
     }catch(e){
       console.warn('Wallet connect failed:', e);

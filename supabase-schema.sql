@@ -92,3 +92,6 @@ alter table ads add column if not exists deleted_at timestamptz;
 do $$ begin
   create policy "public update violating ads" on ads for update using (true) with check (true);
 exception when duplicate_object then null; end $$;
+
+-- War Chat nickname patch: optional nickname display for chat without changing payments/ads.
+alter table chat_messages add column if not exists nickname text;
