@@ -304,7 +304,6 @@
     }
   }
   function openSheet(){
-    if(isArenaLocked()){ alert('ARENA LOCKED BY 1M DOMINATOR. Wait for the countdown to finish.'); return; }
     if(sheet.classList.contains('open')){ closeSheet(); return; }
     closePanel();
     sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false');
@@ -383,52 +382,6 @@
     }
   }
   function closePanel(){ panel.classList.add('hidden'); }
-  function effectTier(amount=0){
-    const a = Number(amount || 0);
-    if(a >= 1000000) return { name:'dominator', text:'🚨 1M ARENA DOMINATOR — LOCKDOWN ACTIVE', dur:2600, cls:'effect-dominator' };
-    if(a >= 900000) return { name:'900k', text:'☢ 900K NEAR-DOMINATOR IMPACT', dur:2200, cls:'effect-900k' };
-    if(a >= 800000) return { name:'800k', text:'🌋 800K MEGA QUAKE', dur:2100, cls:'effect-800k' };
-    if(a >= 700000) return { name:'700k', text:'🔥 700K BURNING RAID', dur:2000, cls:'effect-700k' };
-    if(a >= 600000) return { name:'600k', text:'🚨 600K SIREN STRIKE', dur:1900, cls:'effect-600k' };
-    if(a >= 500000) return { name:'500k', text:'💥 500K TERRITORY SHOCKWAVE', dur:1800, cls:'effect-500k' };
-    if(a >= 400000) return { name:'400k', text:'🪨 400K FALLING FIELD', dur:1700, cls:'effect-400k' };
-    if(a >= 300000) return { name:'300k', text:'⚡ 300K BATTLE QUAKE', dur:1600, cls:'effect-300k' };
-    if(a >= 200000) return { name:'200k', text:'🧨 200K CRACK WAVE', dur:1500, cls:'effect-200k' };
-    if(a >= 100000) return { name:'100k', text:'🔴 100K RED RAID', dur:1400, cls:'effect-100k' };
-    if(a >= 10000) return { name:'crack', text:'⚠ WAR CRACK DETECTED', dur:1200, cls:'effect-crack' };
-    if(a >= 1000) return { name:'shake', text:'⚔ WAR IMPACT DETECTED', dur:1000, cls:'effect-shake' };
-    const small = [
-      { name:'mini-shake', text:'⚔ NEW WAR AD DEPLOYED', dur:750, cls:'effect-mini' },
-      { name:'mini-crack', text:'🧱 SMALL FIELD CRACK', dur:800, cls:'effect-crack' },
-      { name:'mini-fall', text:'🪂 SMALL DROP IN THE ARENA', dur:850, cls:'effect-fall' }
-    ];
-    return small[Math.floor(Math.random() * small.length)];
-  }
-
-  function playImpactSound(amount=0){
-    try{
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if(!AC) return;
-      const ctx = new AC();
-      const gain = ctx.createGain();
-      gain.gain.value = 0.045;
-      gain.connect(ctx.destination);
-      const a = Number(amount || 0);
-      const seq = a >= 1000000 ? [160,120,160,90,90,160] : a >= 100000 ? [220,150,300] : [330,210];
-      let t = ctx.currentTime;
-      seq.forEach((freq, i)=>{
-        const osc = ctx.createOscillator();
-        osc.type = a >= 1000000 ? 'sawtooth' : 'square';
-        osc.frequency.value = freq;
-        osc.connect(gain);
-        osc.start(t);
-        osc.stop(t + 0.10);
-        t += 0.13;
-      });
-      setTimeout(()=>{ try{ctx.close();}catch(_e){} }, Math.ceil((t-ctx.currentTime)*1000)+150);
-    }catch(_e){}
-  }
-
   function impact(amount=0){
     const flash = $('#impactFlash');
     let alertBox = $('#warAlert');
@@ -438,91 +391,35 @@
       document.body.appendChild(alertBox);
     }
     const a = Number(amount || 0);
-    const tier = effectTier(a);
-    document.body.classList.add('shake', tier.cls);
-    if(a >= 1000000) document.body.classList.add('mega-shake');
+    let text = '⚔ NEW WAR AD DEPLOYED';
+    let dur = 750;
+    if(a >= 1000000){ text = '🚨 TSUNAMI ALERT — ARENA DOMINATOR DEPLOYED'; dur = 1800; }
+    else if(a >= 10000){ text = '🚨 MAJOR WAR IMPACT'; dur = 1300; }
+    else if(a >= 1000){ text = '⚠ WAR IMPACT DETECTED'; dur = 1000; }
+    document.body.classList.add(a >= 1000000 ? 'mega-shake' : 'shake');
     flash.classList.add(a >= 1000000 ? 'mega-flash' : 'flash');
-    alertBox.textContent = tier.text;
+    alertBox.textContent = text;
     alertBox.classList.add('show');
-    try{ if(navigator.vibrate) navigator.vibrate(a >= 1000000 ? [250,120,250,120,400,120,600] : a >= 100000 ? [160,70,160,70,220] : [90,60,90]); }catch(_e){}
-    playImpactSound(a);
-    const dur = tier.dur || 1000;
-    if(a >= 1000000) startArenaLock(Date.now() + 60*60*1000, true);
-    setTimeout(()=>{ try{osc.stop(); ctx.close();}catch(_e){} }, a >= 1000000 ? 450 : 180);
+    try{ if(navigator.vibrate) navigator.vibrate(a >= 1000000 ? [250,120,250,120,400] : [90,60,90]); }catch(_e){}
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC){
+        const ctx = new AC();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.value = a >= 1000000 ? 180 : 320;
+        gain.gain.value = 0.035;
+        osc.connect(gain); gain.connect(ctx.destination); osc.start();
+        setTimeout(()=>{ try{osc.stop(); ctx.close();}catch(_e){} }, a >= 1000000 ? 450 : 180);
       }
     }catch(_e){}
     setTimeout(()=>{
-      document.body.classList.remove('shake','mega-shake','effect-mini','effect-crack','effect-fall','effect-shake','effect-100k','effect-200k','effect-300k','effect-400k','effect-500k','effect-600k','effect-700k','effect-800k','effect-900k','effect-dominator');
+      document.body.classList.remove('shake','mega-shake');
       flash.classList.remove('flash','mega-flash');
       alertBox.classList.remove('show');
     }, dur);
   }
-
-  let arenaLockUntil = 0;
-  let arenaLockTimer = null;
-  function getLockOverlay(){
-    let el = $('#arenaLockOverlay');
-    if(!el){
-      el = document.createElement('div');
-      el.id = 'arenaLockOverlay';
-      el.innerHTML = `<div class="lock-card"><div class="lock-title">🚨 ARENA LOCKED BY 1M DOMINATOR</div><div class="lock-sub">No one can place ads while lockdown is active.</div><div id="lockCountdown" class="lock-count">60:00</div></div>`;
-      document.body.appendChild(el);
-    }
-    return el;
-  }
-  function formatLockTime(ms){
-    const total = Math.max(0, Math.ceil(ms/1000));
-    const m = String(Math.floor(total/60)).padStart(2,'0');
-    const s = String(total%60).padStart(2,'0');
-    return `${m}:${s}`;
-  }
-  function tickSound(){
-    try{
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if(!AC) return;
-      const ctx = new AC();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square'; osc.frequency.value = 880; gain.gain.value = 0.025;
-      osc.connect(gain); gain.connect(ctx.destination); osc.start();
-      setTimeout(()=>{ try{osc.stop(); ctx.close();}catch(_e){} }, 45);
-    }catch(_e){}
-  }
-  function isArenaLocked(){ return arenaLockUntil && Date.now() < arenaLockUntil; }
-  function applyLockUi(){
-    const locked = isArenaLocked();
-    const el = getLockOverlay();
-    el.classList.toggle('show', !!locked);
-    const c = $('#lockCountdown');
-    if(c) c.textContent = formatLockTime(arenaLockUntil - Date.now());
-    ['addBtn','mobileAddBtn','deployBtn'].forEach(id => { const b = $('#'+id); if(b) b.disabled = !!locked; });
-    document.body.classList.toggle('arena-locked', !!locked);
-  }
-  function startArenaLock(until, loud=false){
-    arenaLockUntil = Math.max(arenaLockUntil || 0, Number(until || 0));
-    if(arenaLockTimer) clearInterval(arenaLockTimer);
-    applyLockUi();
-    arenaLockTimer = setInterval(()=>{
-      applyLockUi();
-      if(isArenaLocked()) tickSound();
-      else { clearInterval(arenaLockTimer); arenaLockTimer = null; applyLockUi(); }
-    }, 1000);
-    if(loud) tickSound();
-  }
-  function refreshArenaLockFromRows(rows){
-    let until = 0;
-    (rows || []).forEach(r => {
-      const amount = Number(r?.amount || 0);
-      if(amount >= 1000000){
-        const created = new Date(r.created_at || Date.now()).getTime();
-        const lockEnd = created + 60*60*1000;
-        if(lockEnd > Date.now()) until = Math.max(until, lockEnd);
-      }
-    });
-    if(until) startArenaLock(until, false);
-    else { arenaLockUntil = 0; applyLockUi(); }
-  }
-
   function paidAmount(r){ return Math.max(0, Number(r?.amount || 0)); }
   function adDisplayName(r){ return (r?.name || r?.ad_name || 'War Ad').toString().slice(0,40); }
   function buildLiveFeed(rows){
@@ -735,7 +632,6 @@
 
     window.__JAKWO_ROWS = rows;
     refreshStatsFromRows(rows);
-    refreshArenaLockFromRows(rows);
     loadAdsBusy = false;
   }
 
@@ -1060,7 +956,6 @@
   }
 
   async function deploy(){
-    if(isArenaLocked()){ alert('ARENA LOCKED BY 1M DOMINATOR. Wait for the countdown to finish.'); return; }
     if(!currentAd){ alert('Upload and place a photo first.'); return; }
     if(!wallet){ alert('Connect wallet first.'); return; }
     const voucher = cleanVoucher($('#voucherCode').value);
@@ -1249,37 +1144,20 @@
   function initMobileStageZoom(){
     const app = document.querySelector('.app');
     if(!app || !arena) return;
-    let scale = Number(arena.dataset.zoom || 1) || 1;
+    let scale = 1;
     let startDist = 0;
-    let startScale = scale;
-    let pinchWorldX = 0;
-    let pinchWorldY = 0;
-    let pinchMidX = 0;
-    let pinchMidY = 0;
+    let startScale = 1;
     const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
-    const distance = (t1,t2)=>Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
-    const midpoint = (t1,t2)=>({ x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 });
-    const apply = (keepCenter=false)=>{
-      scale = clamp(scale, 0.65, 3);
+    const apply = ()=>{
       arena.style.transformOrigin = '0 0';
       arena.style.transform = `scale(${scale})`;
       arena.dataset.zoom = String(scale);
-      if(keepCenter){
-        // Keep the pinch focus under the user's fingers instead of jumping to top-left.
-        app.scrollLeft = Math.max(0, pinchWorldX * scale - pinchMidX);
-        app.scrollTop = Math.max(0, pinchWorldY * scale - pinchMidY);
-      }
     };
+    const distance = (t1,t2)=>Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
     app.addEventListener('touchstart', (e)=>{
       if(e.touches && e.touches.length === 2){
-        const r = app.getBoundingClientRect();
-        const m = midpoint(e.touches[0], e.touches[1]);
-        pinchMidX = m.x - r.left;
-        pinchMidY = m.y - r.top;
         startDist = distance(e.touches[0], e.touches[1]);
         startScale = scale;
-        pinchWorldX = (app.scrollLeft + pinchMidX) / startScale;
-        pinchWorldY = (app.scrollTop + pinchMidY) / startScale;
       }
     }, {passive:true});
     app.addEventListener('touchmove', (e)=>{
@@ -1287,12 +1165,12 @@
         e.preventDefault();
         const d = distance(e.touches[0], e.touches[1]);
         if(startDist > 0){
-          scale = startScale * (d / startDist);
-          apply(true);
+          scale = clamp(startScale * (d / startDist), 0.65, 3);
+          apply();
         }
       }
     }, {passive:false});
-    apply(false);
+    apply();
   }
 
   initMobileStageZoom();
