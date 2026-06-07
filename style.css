@@ -474,3 +474,23 @@ body.effect-dominator .arena{animation:dominatorArena 2.6s linear;}
 @keyframes lockPulse{from{filter:brightness(1)}to{filter:brightness(1.25)}}
 body.arena-locked #addBtn, body.arena-locked #mobileAddBtn, body.arena-locked #deployBtn{opacity:.45;filter:grayscale(.4);cursor:not-allowed;}
 @media(max-width:800px){#arenaLockOverlay{top:250px}.lock-card{padding:10px 12px}.lock-title{font-size:15px}.lock-count{font-size:28px}.lock-sub{font-size:11px}}
+
+/* EMERGENCY CLICK FIX: restore clickable layers only. No feature/UI redesign. */
+.topbar{position:fixed!important;top:0!important;left:0!important;right:0!important;overflow:visible!important;z-index:500!important;pointer-events:auto!important;}
+.ticker-wrap{position:fixed!important;z-index:490!important;pointer-events:auto!important;}
+.stats{position:fixed!important;z-index:480!important;pointer-events:auto!important;}
+.app{position:fixed!important;z-index:1!important;pointer-events:auto!important;}
+.arena{position:relative!important;z-index:1!important;}
+.brand,.top-actions,.top-actions *,.navbtn,#connectBtn,#xLink,#tgLink,#addBtn,#chatDockBtn,.mobile-nav,.mobile-nav *{pointer-events:auto!important;}
+.sheet{pointer-events:none!important;}
+.sheet.open{pointer-events:auto!important;}
+.panel.hidden{pointer-events:none!important;}
+.panel:not(.hidden){pointer-events:auto!important;}
+#impactFlash{pointer-events:none!important;}
+#arenaLockOverlay{pointer-events:none!important;}
+.top-deco-layer,.side-deco-layer,.wojak-card{display:none!important;pointer-events:none!important;}
+@media(max-width:800px){
+  .topbar{position:fixed!important;z-index:500!important;}
+  .mobile-nav{z-index:500!important;pointer-events:auto!important;}
+  .app{z-index:1!important;}
+}
