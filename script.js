@@ -770,17 +770,34 @@
   function setPendingPaidAds(rows){
     localStorage.setItem(PENDING_ADS_KEY, JSON.stringify(rows || []));
   }
+  async function secureInsertAd(payload){
+    const url = (config.supabaseUrl || config.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+    const key = config.supabaseAnonKey || config.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    if(!url || !key) throw new Error('Supabase config missing');
+    const res = await fetch(`${url}/functions/v1/verify-and-insert-ad`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'apikey': key,
+        'authorization': `Bearer ${key}`
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok || !data.ok){
+      throw new Error(data.error || `Secure ad insert failed (${res.status})`);
+    }
+    return data;
+  }
   async function retryPendingPaidAds(){
-    if(!supa) return;
     const pending = getPendingPaidAds();
     if(!pending.length) return;
     const stillPending = [];
     for(const rec of pending){
       try{
-        const { error } = await supa.from('ads').insert(rec);
-        if(error) throw error;
+        await secureInsertAd({ ad: rec, tx_signature: rec.tx_signature || null, voucher_code: rec.voucher_code || null, expected_amount: Number(rec.display_amount || rec.amount || 0) });
       }catch(e){
-        console.warn('Pending paid ad sync still failed:', e);
+        console.warn('Pending paid/voucher ad sync still failed:', e);
         stillPending.push(rec);
       }
     }
@@ -849,51 +866,33 @@
     setLocalAds(rows);
 
     if(supa){
+      const voucherCode = cleanVoucher($('#voucherCode')?.value || '') || null;
+      const tx = el.dataset.tx || null;
+      const paidAmount = Number(el.dataset.displayAmount || rec.amount || 0);
+      const securePayload = {
+        image_url: rec.image_url,
+        link: rec.link,
+        wallet: rec.wallet,
+        amount: Number(rec.amount || 0),
+        display_amount: paidAmount,
+        x: rec.x, y: rec.y, w: rec.w, h: rec.h,
+        x_percent: rec.x_percent, y_percent: rec.y_percent, w_percent: rec.w_percent, h_percent: rec.h_percent,
+        name: rec.name,
+        locked: true,
+        voucher_code: voucherCode,
+        tx_signature: tx,
+        is_deleted:false,
+        deleted:false
+      };
       try{
-        const voucherCode = cleanVoucher($('#voucherCode')?.value || '') || null;
-        const tx = el.dataset.tx || null;
-        const paidAmount = Number(el.dataset.displayAmount || rec.amount || 0);
-        const common = {
-          image_url: rec.image_url,
-          link: rec.link,
-          wallet: rec.wallet,
-          amount: Number(rec.amount || paidAmount || 0),
-          display_amount: paidAmount,
-          x: rec.x, y: rec.y, w: rec.w, h: rec.h,
-          name: rec.name,
-          locked: true
-        };
-        const commonNoDisplay = { ...common }; delete commonNoDisplay.display_amount;
-        const tries = [
-          { ...common, voucher_code: voucherCode, tx_signature: tx, is_deleted:false, deleted:false },
-          { ...commonNoDisplay, voucher_code: voucherCode, tx_signature: tx },
-          { ...commonNoDisplay, voucher_code: voucherCode, tx_signature: tx },
-          { ...commonNoDisplay }
-        ];
-        let saved = false, lastError = null;
-        for(const payload of tries){
-          const { error } = await supa.from('ads').insert(payload);
-          if(!error){ saved = true; break; }
-          lastError = error;
-          console.warn('Supabase ad save attempt failed, retrying smaller payload:', error);
-        }
-        if(saved){
-          console.log('SUPABASE AD SAVED');
-          // Supabase is the source of truth for all devices. Clear local emergency duplicate.
-          setLocalAds(getLocalAds().filter(a => a.id !== rec.id));
-          return true;
-        } else {
-          console.error('Supabase ad save failed after retries:', lastError);
-          // Keep paid/voucher ad safely stored on this device and retry syncing later.
-          const pending = getPendingPaidAds().filter(a => (a.tx_signature || a.image_url) !== (tries[0].tx_signature || tries[0].image_url));
-          pending.push(tries[0]);
-          setPendingPaidAds(pending);
-          return false;
-        }
+        await secureInsertAd({ ad: securePayload, tx_signature: tx, voucher_code: voucherCode, expected_amount: paidAmount });
+        console.log('SUPABASE AD SAVED THROUGH SECURE VERIFY FUNCTION');
+        setLocalAds(getLocalAds().filter(a => a.id !== rec.id));
+        return true;
       }catch(e){
-        console.warn('Supabase ad save failed, local save still kept:', e);
-        const pending = getPendingPaidAds().filter(a => (a.tx_signature || a.image_url) !== ((el.dataset.tx || null) || rec.image_url));
-        pending.push({ image_url: rec.image_url, link: rec.link, wallet: rec.wallet, amount: rec.amount, display_amount: Number(el.dataset.displayAmount || rec.amount || 0), x: rec.x, y: rec.y, w: rec.w, h: rec.h, name: rec.name, locked: true, voucher_code: voucherCode, tx_signature: el.dataset.tx || null });
+        console.warn('Secure Supabase ad save failed, local save still kept:', e);
+        const pending = getPendingPaidAds().filter(a => (a.tx_signature || a.image_url) !== ((tx || null) || rec.image_url));
+        pending.push(securePayload);
         setPendingPaidAds(pending);
         return false;
       }
@@ -1308,23 +1307,9 @@
     }
 
     if(voucher){
+      // Voucher burning is now handled by the secure Supabase Edge Function together with ad insert.
       markVoucherUsed(voucher);
-      if(supa){
-        try{
-          const updatePayload = { used:true, used_by: wallet, used_at: new Date().toISOString() };
-          let q = supa.from('voucher_codes').update(updatePayload);
-          if(deployedAd.dataset.voucherId) q = q.eq('id', deployedAd.dataset.voucherId);
-          else q = q.eq('code', voucher);
-          const { error } = await q;
-          if(error) throw error;
-          setVoucherStatus('✅ Voucher used and burned', 'ok');
-        }catch(e){
-          console.warn('Voucher update failed:', e);
-          setVoucherStatus('⚠️ Ad deployed, but voucher status update failed. Check admin.', 'bad');
-        }
-      } else {
-        setVoucherStatus('✅ Voucher used', 'ok');
-      }
+      setVoucherStatus('✅ Voucher accepted. Burning after secure deploy...', 'ok');
     }
     if(paymentSignature) deployedAd.dataset.tx = paymentSignature;
     deployedAd.dataset.displayAmount = String(p.price || 0);
