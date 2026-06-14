@@ -612,3 +612,15 @@ body.effect-static .ad.locked:after{content:'';position:absolute;inset:0;pointer
   line-height:1.2;
   min-height:0;
 }
+
+
+/* TG phone visibility fix */
+@media (max-width:800px){
+  .top-actions{
+    gap:4px!important;
+    transform:translateX(-28px)!important;
+  }
+  .wallet,.square{
+    padding:8px 10px!important;
+  }
+}
