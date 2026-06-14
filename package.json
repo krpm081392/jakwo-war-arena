@@ -41,5 +41,9 @@
     "recharts": "^2.15.4",
     "vaul": "^1.1.2"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "tailwindcss": "^3.4.17",
+    "postcss": "^8.4.49",
+    "autoprefixer": "^10.4.20"
+  }
 }
