@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JAKWO War Arena</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="impactFlash"></div>
+  <main class="arena-page">
+    <header class="topbar">
+      <a class="brand" href="index.html"><span>JAKWO</span><small>WAR ARENA</small></a>
+      <nav class="top-actions">
+        <button id="connectBtn" class="connect">CONNECT WALLET</button>
+        <a class="social" id="xLink" target="_blank">X</a>
+        <a class="social tg" id="tgLink" target="_blank">✈</a>
+      </nav>
+    </header>
+
+    <section class="ticker">
+      <b>LIVE</b>
+      <div class="ticker-track"><span>No fake numbers. Real arena stats only.</span><span>Buy. Place. Block. Repeat.</span><span>Ads are permanent forever — only buried by newer wars.</span></div>
+      <a href="#" class="view-all">VIEW ALL</a>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat"><i>⚔</i><div><small>TOTAL ADS</small><strong id="totalAds">0</strong><em>All time placed</em></div></article>
+      <article class="stat"><i>💲</i><div><small>USDC IN ARENA</small><strong id="usdcArena">0.00</strong><em>Real volume</em></div></article>
+      <article class="stat"><i>⚡</i><div><small>LATEST WAR</small><strong id="latestWar">NONE</strong><em>Waiting for first attack</em></div></article>
+      <article class="stat"><i>👑</i><div><small>TOP WARLORD</small><strong id="topWarlord">NONE YET</strong><em>Highest spender</em></div></article>
+    </section>
+
+    <aside class="side-rail">
+      <button data-panel="rules">❔<span>RULES</span></button>
+      <button data-panel="chat">💬<span>WAR CHAT</span></button>
+      <a href="story.html">📖<span>STORY</span></a>
+      <button data-panel="lords">📊<span>LEADERBOARD</span></button>
+    </aside>
+
+    <section class="battlefield" id="battlefield">
+      <div class="battle-bg"></div>
+      <div class="cost-badge"><small>LIVE WAR COST</small><strong id="liveCost">0.50 USDC</strong><b>LIVE</b></div>
+
+      <div class="empty-warfield" id="emptyWarfield">
+        <h1>BE THE FIRST WARLORD</h1>
+        <p>No fake posters. This battlefield starts empty and fills only with real wars.</p>
+        <button class="mini-cta" id="emptyPlaceBtn">＋ ADD WAR PHOTO</button>
+      </div>
+
+      <div id="userAd" class="placed-ad hidden">
+        <button id="removeAd" class="remove">×</button>
+        <img id="adPreview" alt="Your ad" />
+        <div class="resize-handle"></div>
+      </div>
+
+      <button id="placeAdBtn" class="place-ad"><span>＋</span><b>PLACE AD</b></button>
+      <div class="zoom-mini"><button>-</button><span>80%</span><button>+</button><button>☝</button></div>
+    </section>
+
+    <nav class="mobile-nav">
+      <button data-panel="rules">❔<span>RULES</span></button>
+      <button data-panel="chat">💬<span>CHAT</span></button>
+      <button id="mobilePlaceBtn" class="mobile-add">＋<span>ADD</span></button>
+      <a href="story.html">📖<span>STORY</span></a>
+    </nav>
+  </main>
+
+  <section id="sheet" class="bottom-sheet" aria-hidden="true">
+    <div class="sheet-card">
+      <button id="closeSheet" class="sheet-close">×</button>
+      <div class="grab"></div>
+      <h2>Place Your Weapon</h2>
+      <div class="pick-row">
+        <label class="pick"><input id="imageInput" type="file" accept="image/*" hidden><span>🖼</span><b>Photos</b></label>
+        <label class="pick"><input id="fileInput" type="file" accept="image/*" hidden><span>📁</span><b>Files</b></label>
+      </div>
+      <label class="field">Link <small>(optional)</small><input id="adLink" placeholder="https://yourlink.com"></label>
+      <label class="field">Voucher code <small>(optional)</small><input id="voucherCode" placeholder="JAKWO-1000-0001"></label>
+      <div class="coverage-line"><span>Coverage</span><b id="coverageText">1%</b></div>
+      <input id="coverageSlider" class="slider" type="range" min="0.0385" max="100" value="1" step="0.1">
+      <div class="price-row"><span>Price</span><strong id="priceText">0.50 USDC</strong></div>
+      <button id="deployBtn" class="deploy">PREVIEW ON WARFIELD</button>
+      <button id="confirmBtn" class="deploy confirm hidden">PAY / VOUCHER DEPLOY</button>
+      <p class="note">Drag anywhere. Pinch/slider resize. 100% arena = 1,000,000 USDC.</p>
+    </div>
+  </section>
+
+  <section id="panel" class="panel hidden"><div class="panel-box"><button id="closePanel">×</button><div id="panelContent"></div></div></section>
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
