@@ -19,9 +19,11 @@ function Header(){
     <div className="top-head">
       <Link href="/" className="brand"><span>JAKWO</span><b>ARENA ADS</b></Link>
       <div className="top-actions">
-        <a className="jakwo-pump-exact" href="https://pump.fun/coin/EgarvX6JFtcqmjXw5aAvk9yTLa3CnwNmdbwAmwPNpump" target="_blank" rel="noopener noreferrer" aria-label="Open JAKWO on Pump.fun"><img src="/pump-fun-logo.png" alt="Pump.fun JAKWO" /></a>
         <button className="btn black" onClick={()=>window.dispatchEvent(new Event('connect-wallet'))}>CONNECT</button>
         <a className="btn tan" href={TWITTER} target="_blank">X</a>
+        <a href="https://pump.fun/coin/EgarvX6JFtcqmjXw5aAvk9yTLa3CnwNmdbwAmwPNpump" target="_blank" rel="noopener noreferrer" aria-label="Pump.fun JAKWO coin" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'46px',height:'46px'}}>
+          <img src="/pump-fun-logo.png" alt="Pump.fun" style={{width:'46px',height:'46px',objectFit:'contain',display:'block'}} />
+        </a>
         <a className="btn tan" href={TELEGRAM} target="_blank">TG</a>
       </div>
     </div>
